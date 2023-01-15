@@ -168,7 +168,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         """Get the latest data and updates the states."""
         if (
             not self._force_trigger
-            and dt_util.utcnow() - self._last_trigger < timedelta(minutes=5)
+            and dt_util.utcnow() - self._last_trigger < timedelta(minutes=1)
         ):
             _LOGGER.debug("Skip update")
             return
