@@ -1,4 +1,5 @@
 # Hisense TV Integration for Home Assistant
+# This is a fork from sehaas/ha_hisense_tv, didn't change anything but just including my own installation docs in this readme.md at the end of of this readme file.
 
 Integration an Hisense TV as media player into Home Assistant. The communication is handled via the integrated MQTT broker and wake-on-LAN.
 Requires Home Assistant >= `2021.12.x`.
@@ -98,3 +99,14 @@ Everything I needed to write this integration could be gathered from these sourc
 * [HA Community](https://community.home-assistant.io/t/hisense-tv-control/97638/1)
 * [RemoteNOW App](https://play.google.com/store/apps/details?id=com.universal.remote.ms)
 * [@d3nd3](https://github.com/d3nd3/Hisense-mqtt-keyfiles)
+
+# My own sucessful installation on 3 hisense tv
+
+Download the package put it in /config/custom_componennts
+HA->settings->intergrations->hisense_tv
+
+"The integration can be added via the Home Assistant UI. Add the integration and setup your TV. During the first setup your TV should be turned on. The integration requires a PIN code from you TV. The PIN will be triggered automatically during setup. This is a onetime step where the client `HomeAssistant` is requesting access to remote controll the TV." <-- 
+
+still editing<-----
+
+
