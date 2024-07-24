@@ -168,7 +168,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         """Get the latest data and updates the states."""
         if (
             not self._force_trigger
-            and dt_util.utcnow() - self._last_trigger < timedelta(minutes=5)
+            and dt_util.utcnow() - self._last_trigger < timedelta(minutes=1)
         ):
             _LOGGER.debug("Skip update")
             return
@@ -180,9 +180,9 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         await mqtt.async_publish(
             hass=self._hass,
             topic=self._out_topic(
-                "/remoteapp/tv/platform_service/%s/actions/picturesetting"
+                "/remoteapp/tv/ui_service/%s/actions/gettvstate"
             ),
-            payload='{"action": "get_menu_info"}',
+            payload='',
             retain=False,
         )
 
