@@ -11,27 +11,13 @@ import wakeonlan
 from homeassistant.components import mqtt
 from homeassistant.util import dt as dt_util
 from homeassistant.components.media_player import (
-    DEVICE_CLASS_TV,
+    MediaPlayerDeviceClass,
     PLATFORM_SCHEMA,
     BrowseMedia,
     MediaPlayerEntity,
-)
-from homeassistant.components.media_player.const import (
-    MEDIA_CLASS_APP,
-    MEDIA_CLASS_CHANNEL,
-    MEDIA_CLASS_DIRECTORY,
-    MEDIA_TYPE_APP,
-    MEDIA_TYPE_APPS,
-    MEDIA_TYPE_CHANNEL,
-    MEDIA_TYPE_TVSHOW,
-    SUPPORT_BROWSE_MEDIA,
-    SUPPORT_PLAY_MEDIA,
-    SUPPORT_SELECT_SOURCE,
-    SUPPORT_TURN_OFF,
-    SUPPORT_TURN_ON,
-    SUPPORT_VOLUME_MUTE,
-    SUPPORT_VOLUME_SET,
-    SUPPORT_VOLUME_STEP,
+    MediaPlayerEntityFeature,
+    MediaType,
+    MediaClass
 )
 from homeassistant.config_entries import SOURCE_IMPORT
 from homeassistant.const import (
@@ -173,13 +159,13 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         """Content type of current playing media."""
         _LOGGER.debug("media_content_type")
         # return MEDIA_TYPE_CHANNEL
-        return MEDIA_TYPE_TVSHOW
+        return MediaType.TVSHOW
 
     @property
     def device_class(self):
         """Set the device class to TV."""
         _LOGGER.debug("device_class")
-        return DEVICE_CLASS_TV
+        return MediaPlayerDeviceClass.TV
 
     @property
     def name(self):
@@ -194,14 +180,14 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         """Flag media player features that are supported."""
         _LOGGER.debug("supported_features")
         return (
-            SUPPORT_SELECT_SOURCE
-            | SUPPORT_TURN_ON
-            | SUPPORT_TURN_OFF
-            | SUPPORT_VOLUME_MUTE
-            | SUPPORT_VOLUME_STEP
-            | SUPPORT_VOLUME_SET
-            | SUPPORT_BROWSE_MEDIA
-            | SUPPORT_PLAY_MEDIA
+            MediaPlayerEntityFeature.SELECT_SOURCE
+            | MediaPlayerEntityFeature.TURN_ON
+            | MediaPlayerEntityFeature.TURN_OFF 
+            | MediaPlayerEntityFeature.VOLUME_MUTE
+            | MediaPlayerEntityFeature.VOLUME_STEP
+            | MediaPlayerEntityFeature.VOLUME_SET
+            | MediaPlayerEntityFeature.BROWSE_MEDIA
+            | MediaPlayerEntityFeature.PLAY_MEDIA
         )
 
     @property
@@ -536,7 +522,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
     async def _build_library_node(self):
         node = BrowseMedia(
             title="Media Library",
-            media_class=MEDIA_CLASS_DIRECTORY,
+            media_class=MediaClass.DIRECTORY,
             media_content_type="library",
             media_content_id="library",
             can_play=False,
@@ -569,7 +555,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                         node.children.append(
                             BrowseMedia(
                                 title=item.get("list_name"),
-                                media_class=MEDIA_CLASS_DIRECTORY,
+                                media_class=MediaClass.DIRECTORY,
                                 media_content_type="channellistinfo",
                                 media_content_id=key,
                                 can_play=False,
@@ -589,8 +575,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         node.children.append(
             BrowseMedia(
                 title="Applications",
-                media_class=MEDIA_CLASS_APP,
-                media_content_type=MEDIA_TYPE_APPS,
+                media_class=MediaClass.APP,
+                media_content_type=MediaClass.APPS,
                 media_content_id="app_list",
                 can_play=False,
                 can_expand=True,
@@ -601,8 +587,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
     async def _build_app_list_node(self):
         node = BrowseMedia(
             title="Applications",
-            media_class=MEDIA_CLASS_APP,
-            media_content_type=MEDIA_TYPE_APPS,
+            media_class=MediaClass.APP,
+            media_content_type=MediaClass.APPS,
             media_content_id="app_list",
             can_play=False,
             can_expand=True,
@@ -628,8 +614,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                         node.children.append(
                             BrowseMedia(
                                 title=item.get("name"),
-                                media_class=MEDIA_CLASS_APP,
-                                media_content_type=MEDIA_TYPE_APP,
+                                media_class=MediaClass.APP,
+                                media_content_type=MediaClass.APP,
                                 media_content_id=nid,
                                 can_play=True,
                                 can_expand=False,
@@ -658,7 +644,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         list_name = self._channel_infos.get(media_content_id).get("list_name")
         node = BrowseMedia(
             title=list_name,
-            media_class=MEDIA_CLASS_DIRECTORY,
+            media_class=MediaClass.DIRECTORY,
             media_content_type="channellistinfo",
             media_content_id=media_content_id,
             can_play=False,
@@ -692,8 +678,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                         node.children.append(
                             BrowseMedia(
                                 title=item.get("channel_name"),
-                                media_class=MEDIA_CLASS_CHANNEL,
-                                media_content_type=MEDIA_TYPE_CHANNEL,
+                                media_class=MediaType.CHANNEL,
+                                media_content_type=MediaType.CHANNEL,
                                 media_content_id=item.get("channel_param"),
                                 can_play=True,
                                 can_expand=False,
@@ -723,7 +709,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                 ),
                 payload=channel,
             )
-        elif media_type == MEDIA_CLASS_APP:
+        elif media_type == MediaClass.APP:
             app = self._app_list.get(media_id)
             payload = json.dumps(
                 {"appId": media_id, "name": app.get("name"), "url": app.get("url")}

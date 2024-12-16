@@ -4,7 +4,7 @@ import logging
 import wakeonlan
 
 from homeassistant.components import mqtt
-from homeassistant.components.switch import DEVICE_CLASS_SWITCH, SwitchEntity
+from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.const import CONF_IP_ADDRESS, CONF_MAC, CONF_NAME
 
 from .const import CONF_MQTT_IN, CONF_MQTT_OUT, DEFAULT_NAME, DOMAIN
@@ -95,7 +95,7 @@ class HisenseTvSwitch(SwitchEntity, HisenseTvBase):
     @property
     def device_class(self):
         _LOGGER.debug("device_class")
-        return DEVICE_CLASS_SWITCH
+        return SwitchDeviceClass.SWITCH
 
     @property
     def should_poll(self):
