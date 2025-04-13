@@ -576,7 +576,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             BrowseMedia(
                 title="Applications",
                 media_class=MediaClass.APP,
-                media_content_type=MediaClass.APPS,
+                media_content_type=MediaType.APPS,
                 media_content_id="app_list",
                 can_play=False,
                 can_expand=True,
@@ -588,7 +588,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         node = BrowseMedia(
             title="Applications",
             media_class=MediaClass.APP,
-            media_content_type=MediaClass.APPS,
+            media_content_type=MediaType.APPS,
             media_content_id="app_list",
             can_play=False,
             can_expand=True,
@@ -615,7 +615,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                             BrowseMedia(
                                 title=item.get("name"),
                                 media_class=MediaClass.APP,
-                                media_content_type=MediaClass.APP,
+                                media_content_type=MediaType.APP,
                                 media_content_id=nid,
                                 can_play=True,
                                 can_expand=False,
