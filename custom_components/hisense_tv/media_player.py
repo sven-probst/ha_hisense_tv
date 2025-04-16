@@ -4,6 +4,7 @@ import asyncio
 import json
 from json.decoder import JSONDecodeError
 import logging
+import re
 
 import voluptuous as vol
 import wakeonlan
@@ -597,7 +598,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
         stream_get, unsubscribe_applist = await mqtt_pub_sub(
             hass=self._hass,
-            pub=self._out_topic("/remoteapp/tv/ui_service/%s/actions/applist"),
+            pub=self._out_topic("/remoteapp/tv/ui_service/%s/actions/vidaaapplist"),
             sub=self._in_topic("/remoteapp/mobile/%s/ui_service/data/applist"),
         )
 
@@ -609,14 +610,18 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                         _LOGGER.debug("skipping empty app list")
                         break
                     payload = json.loads(payload_string)
+                    _LOGGER.debug("payload %s", payload_string)
                     self._app_list = {item.get("appId"): item for item in payload}
                     for nid, item in self._app_list.items():
+                        _LOGGER.debug("adding app %s", item.get("name"))
+                        match = re.search(r'https://[^\s]+', item.get("httpIcon"))
                         node.children.append(
                             BrowseMedia(
                                 title=item.get("name"),
                                 media_class=MediaClass.APP,
                                 media_content_type=MediaType.APP,
                                 media_content_id=nid,
+                                thumbnail=match.group(0),
                                 can_play=True,
                                 can_expand=False,
                             )
@@ -678,7 +683,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                         node.children.append(
                             BrowseMedia(
                                 title=item.get("channel_name"),
-                                media_class=MediaType.CHANNEL,
+                                media_class=MediaClass.CHANNEL,
                                 media_content_type=MediaType.CHANNEL,
                                 media_content_id=item.get("channel_param"),
                                 can_play=True,
@@ -700,7 +705,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         """Send the play_media command to the media player."""
         _LOGGER.debug("async_play_media %s\n%s", media_id, kwargs)
 
-        if media_type == MEDIA_TYPE_CHANNEL:
+        if media_type == MediaType.CHANNEL:
             channel = json.dumps({"channel_param": media_id})
             await mqtt.async_publish(
                 hass=self._hass,
@@ -709,7 +714,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                 ),
                 payload=channel,
             )
-        elif media_type == MediaClass.APP:
+        elif media_type == MediaType.APP:
             app = self._app_list.get(media_id)
             payload = json.dumps(
                 {"appId": media_id, "name": app.get("name"), "url": app.get("url")}
