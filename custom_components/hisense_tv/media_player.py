@@ -20,6 +20,9 @@ from homeassistant.components.media_player import (
     MediaType,
     MediaClass
 )
+from homeassistant.components.media_player.const import (
+    MediaPlayerState,
+)
 from homeassistant.config_entries import SOURCE_IMPORT
 from homeassistant.const import (
     CONF_IP_ADDRESS,
@@ -27,6 +30,7 @@ from homeassistant.const import (
     CONF_NAME,
     STATE_OFF,
     STATE_ON,
+    STATE_PLAYING,
 )
 from homeassistant.helpers import config_validation as cv
 
@@ -146,9 +150,14 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._channel_name = None
         self._channel_num = None
         self._channel_infos = {}
+        self._duration = None
         self._app_list = {}
         self._last_trigger = dt_util.utcnow()
         self._force_trigger = False
+        self._endtime = None
+        self._starttime = None
+        self._position = None
+        self._media_position_updated_at = dt_util.utcnow()
 
     @property
     def should_poll(self):
@@ -189,6 +198,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             | MediaPlayerEntityFeature.VOLUME_SET
             | MediaPlayerEntityFeature.BROWSE_MEDIA
             | MediaPlayerEntityFeature.PLAY_MEDIA
+            | MediaPlayerEntityFeature.SEEK
         )
 
     @property
@@ -329,7 +339,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         """Return the current input source."""
         _LOGGER.debug("source")
         return self._source_name
-
+    
     @property
     def media_title(self):
         """Return the title of current playing media."""
@@ -338,7 +348,49 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
         _LOGGER.debug("media_title %s", self._title)
         return self._title
+    
+    @property
+    def media_duration(self):
+        """Return the duration of current playing media."""
+        if self._state == STATE_OFF:
+            return None
+  
+        if self._endtime is not None and self._starttime is not None:
+           duration = self._endtime - self._starttime
+        else: 
+           return None
+        _LOGGER.debug("media_duration %s", duration)
+        return duration
+    
+    @property
+    def media_position(self):
+        """Return the actual position of current playing media."""
+        if self._state == STATE_OFF:
+            return None
 
+        if self._endtime is not None and dt_util.utcnow().timestamp() > self._endtime:
+           self._starttime = None
+           self._endtime = None
+           self._position = None
+           self._media_position_updated_at = dt_util.utcnow() 
+           return None
+ 
+        if self._starttime is not None :
+           position = int(dt_util.utcnow().timestamp()) - self._starttime
+        else: 
+           return None
+        _LOGGER.debug("media_position %s", position)
+        self._media_position_updated_at = dt_util.utcnow() 
+        return position
+    
+    @property
+    def media_position_updated_at(self):
+        return self._media_position_updated_at
+
+    async def async_media_seek(self, position: float):
+        """Fake implementation: log the requested seek but do nothing."""
+        _LOGGER.info("media_seek called with position=%s (ignored)", position)
+    
     @property
     def media_series_title(self):
         """Return the channel current playing media."""
@@ -430,7 +482,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             payload = []
         _LOGGER.debug("message_received_sourcelist R(%s):\n%s", msg.retain, payload)
         if len(payload) > 0:
-            self._state = STATE_ON
+            self._state = STATE_PLAYING
             self._source_list = {s.get("sourcename"): s for s in payload}
             self._source_list["App"] = {}
 
@@ -442,7 +494,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         _LOGGER.debug("message_received_volume R(%s)\n%s", msg.retain, msg.payload)
         try:
             payload = json.loads(msg.payload)
-            self._state = STATE_ON
+            self._state = STATE_PLAYING
         except JSONDecodeError:
             payload = {}
         if payload.get("volume_type") == 0:
@@ -478,7 +530,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                 payload="",
             )
 
-        self._state = STATE_ON
+        self._state = STATE_PLAYING
         if statetype == "sourceswitch":
             # sourceid:
             # sourcename:
@@ -489,6 +541,9 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             self._title = payload.get("displayname")
             self._channel_name = payload.get("sourcename")
             self._channel_num = None
+            self._starttime = None
+            self._endtime = None
+            self._position = None
         elif statetype == "livetv":
             # progname:
             # channel_num:
@@ -501,11 +556,16 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             self._title = payload.get("progname")
             self._channel_name = payload.get("channel_name")
             self._channel_num = payload.get("channel_num")
+            self._starttime = payload.get("starttime")
+            self._endtime = payload.get("endtime")
         elif statetype == "remote_launcher":
             self._source_name = "App"
             self._title = "Applications"
             self._channel_name = None
             self._channel_num = None
+            self._starttime = None
+            self._endtime = None
+            self._position = None
         elif statetype == "app":
             # name:
             # url:
@@ -513,6 +573,9 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             self._title = payload.get("name")
             self._channel_name = payload.get("url")
             self._channel_num = None
+            self._starttime = None
+            self._endtime = None
+            self._position = None
         elif statetype == "remote_epg":
             pass
         elif statetype == "fake_sleep_0":
