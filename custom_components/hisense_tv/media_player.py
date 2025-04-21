@@ -691,7 +691,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         vidaaapplist_topic = (
             "/remoteapp/tv/ui_service/%s/actions/vidaaapplist"
             if transport_protocol != "1140"
-            else "/remoteapp/tv/platform_service/%s/actions/applist"
+            else "/remoteapp/tv/ui_service/%s/actions/applist"
         )
 
         # get applist
