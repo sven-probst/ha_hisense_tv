@@ -713,19 +713,35 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                     self._app_list = {item.get("appId"): item for item in payload}
                     for nid, item in self._app_list.items():
                         _LOGGER.debug("adding app %s", item.get("name"))
-                        match = re.search(r'https://[^\s]+', item.get("httpIcon"))
-                        node.children.append(
-                            BrowseMedia(
-                                title=item.get("name"),
-                                media_class=MediaClass.APP,
-                                media_content_type=MediaType.APP,
-                                media_content_id=nid,
-                                thumbnail=match.group(0),
-                                can_play=True,
-                                can_expand=False,
+                        match = re.search(r'https?://[^\s]+', item.get("httpIcon"))
+                        thumbnail = match.group(0) if match else None
+                        if thumbnail:
+                            node.children.append(
+                                BrowseMedia(
+                                    title=item.get("name"),
+                                    media_class=MediaClass.APP,
+                                    media_content_type=MediaType.APP,
+                                    media_content_id=nid,
+                                    thumbnail=thumbnail,
+                                    can_play=True,
+                                    can_expand=False,
+                                )
                             )
-                        )
+                        else:
+                            node.children.append(
+                                BrowseMedia(
+                                    title=item.get("name"),
+                                    media_class=MediaClass.APP,
+                                    media_content_type=MediaType.APP,
+                                    media_content_id=nid,
+                                    can_play=True,
+                                    can_expand=False,
+                                )
+                            )
                 except JSONDecodeError as err:
+                    _LOGGER.warning(
+                        "Could not parse Application list from '%s': %s", msg, err.msg
+                    )
                     _LOGGER.warning(
                         "Could not build Application list from '%s': %s", msg, err.msg
                     )
