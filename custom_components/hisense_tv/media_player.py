@@ -659,9 +659,45 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             children=[],
         )
 
+        #  get getdeviceinfo
+        stream_deviceinfo, unsubscribe_deviceinfo = await mqtt_pub_sub(
+            hass=self._hass,
+            pub=self._out_topic("/remoteapp/tv/platform_service/%s/actions/getdeviceinfo"),
+            sub=self._in_topic("/remoteapp/mobile/%s/platform_service/data/getdeviceinfo"),
+        )
+
+        transport_protocol = None
+        try:
+            async for msg in stream_deviceinfo:
+                try:
+                    payload_string = msg[0].payload
+                    if payload_string is None:
+                        _LOGGER.debug("Skipping empty device info")
+                        break
+                    payload = json.loads(payload_string)
+                    transport_protocol = payload.get("transport_protocol")
+                    _LOGGER.debug("Transport Protocol: %s", transport_protocol)
+                except JSONDecodeError as err:
+                    _LOGGER.warning(
+                        "Could not parse device info from '%s': %s", msg, err.msg
+                    )
+                break
+        except asyncio.TimeoutError:
+            _LOGGER.debug("Timeout error - getdeviceinfo")
+        finally:
+            unsubscribe_deviceinfo()
+
+        # dynamic topic based on available transport_protocol
+        vidaaapplist_topic = (
+            "/remoteapp/tv/ui_service/%s/actions/vidaaapplist"
+            if transport_protocol != "1140"
+            else "/remoteapp/tv/platform_service/%s/actions/applist"
+        )
+
+        # get applist
         stream_get, unsubscribe_applist = await mqtt_pub_sub(
             hass=self._hass,
-            pub=self._out_topic("/remoteapp/tv/ui_service/%s/actions/vidaaapplist"),
+            pub=self._out_topic(vidaaapplist_topic),
             sub=self._in_topic("/remoteapp/mobile/%s/ui_service/data/applist"),
         )
 
