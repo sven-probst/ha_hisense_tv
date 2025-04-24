@@ -658,39 +658,21 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             can_expand=True,
             children=[],
         )
+        sensor_entity_id = f"sensor.{self._name.lower().replace(' ', '_')}"
+        sensor_state = self._hass.states.get(sensor_entity_id)
 
-        #  get getdeviceinfo
-        stream_deviceinfo, unsubscribe_deviceinfo = await mqtt_pub_sub(
-            hass=self._hass,
-            pub=self._out_topic("/remoteapp/tv/platform_service/%s/actions/getdeviceinfo"),
-            sub=self._in_topic("/remoteapp/mobile/%s/platform_service/data/getdeviceinfo"),
-        )
-
-        transport_protocol = None
-        try:
-            async for msg in stream_deviceinfo:
-                try:
-                    payload_string = msg[0].payload
-                    if payload_string is None:
-                        _LOGGER.debug("Skipping empty device info")
-                        break
-                    payload = json.loads(payload_string)
-                    transport_protocol = payload.get("transport_protocol")
-                    _LOGGER.debug("Transport Protocol: %s", transport_protocol)
-                except JSONDecodeError as err:
-                    _LOGGER.warning(
-                        "Could not parse device info from '%s': %s", msg, err.msg
-                    )
-                break
-        except asyncio.TimeoutError:
-            _LOGGER.debug("Timeout error - getdeviceinfo")
-        finally:
-            unsubscribe_deviceinfo()
+        if sensor_state and sensor_state.attributes:
+            device_info = sensor_state.attributes.get("device_info", {})
+            if isinstance(device_info, dict):  # test device_info is dictionary
+                transport_protocol = device_info.get("transport_protocol")
+            else:
+                _LOGGER.warning("device_info has no valid info: %s", device_info)
+                transport_protocol = None
 
         # dynamic topic based on available transport_protocol
         vidaaapplist_topic = (
             "/remoteapp/tv/ui_service/%s/actions/vidaaapplist"
-            if transport_protocol != "1140"
+            if transport_protocol and transport_protocol != "1140"
             else "/remoteapp/tv/ui_service/%s/actions/applist"
         )
 
@@ -713,8 +695,13 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                     self._app_list = {item.get("appId"): item for item in payload}
                     for nid, item in self._app_list.items():
                         _LOGGER.debug("adding app %s", item.get("name"))
-                        match = re.search(r'https?://[^\s]+', item.get("httpIcon"))
-                        thumbnail = match.group(0) if match else None
+                        # httpIcon must exist and be a string
+                        http_icon = item.get("httpIcon")
+                        if isinstance(http_icon, str):
+                            match = re.search(r'https?://[^\s]+', http_icon)
+                            thumbnail = match.group(0) if match else None
+                        else:
+                            thumbnail = None
                         if thumbnail:
                             node.children.append(
                                 BrowseMedia(

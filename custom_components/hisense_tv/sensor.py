@@ -57,6 +57,8 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         )
         self._is_available = False
         self._state = {}
+        self._device_info = {}  # store "getdeviceinfo"
+        self._tv_info = {}  # store "gettvinfo"
         self._last_trigger = dt_util.utcnow()
         self._force_trigger = False
 
@@ -93,6 +95,21 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             self._message_received_value,
         )
 
+        # subscribe topic for "gettvinfo"
+        self._subscriptions["tvinfo"] = await mqtt.async_subscribe(
+            self._hass,
+            self._in_topic("/remoteapp/mobile/%s/platform_service/data/gettvinfo"),
+            self._message_received_tvinfo,
+        )
+
+        # subscribe topic for "getdeviceinfo"
+        self._subscriptions["deviceinfo"] = await mqtt.async_subscribe(
+            self._hass,
+            self._in_topic("/remoteapp/mobile/%s/platform_service/data/getdeviceinfo"),
+            self._message_received_deviceinfo,
+        )
+
+
     async def _message_received_turnoff(self, msg):
         _LOGGER.debug("message_received_turnoff")
         self._is_available = False
@@ -107,6 +124,50 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         self._is_available = True
         self._force_trigger = True
         self.async_write_ha_state()
+
+        # publish "getdeviceinfo"-Topic
+        await mqtt.async_publish(
+            hass=self._hass,
+            topic=self._out_topic(
+                "/remoteapp/tv/platform_service/%s/actions/getdeviceinfo"
+            ),
+            payload="",
+            retain=False,
+        )
+        # publish "gettvinfo"-Topic
+        await mqtt.async_publish(
+            hass=self._hass,
+            topic=self._out_topic(
+                "/remoteapp/tv/platform_service/%s/actions/gettvinfo"
+            ),
+            payload="",
+            retain=False,
+        )
+
+    async def _message_received_deviceinfo(self, msg):
+        """received message 'getdeviceinfo'."""
+        try:
+            payload = json.loads(msg.payload)
+        except JSONDecodeError:
+            _LOGGER.warning("error parsing 'getdeviceinfo': %s", msg.payload)
+            return
+
+        _LOGGER.debug("Deviceinfo empfangen: %s", payload)
+        self._device_info = payload
+        self.async_write_ha_state()    
+
+    async def _message_received_tvinfo(self, msg):
+        """received message 'gettvinfo'."""
+        try:
+            payload = json.loads(msg.payload)
+        except JSONDecodeError:
+            _LOGGER.warning("error parsing 'gettvinfo': %s", msg.payload)
+            return
+
+        _LOGGER.debug("tvinfo empfangen: %s", payload)
+        self._tv_info = payload
+        self.async_write_ha_state()   
+
 
     async def _message_received(self, msg):
         self._is_available = True
@@ -162,7 +223,10 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
     @property
     def extra_state_attributes(self):
         """Return the state attributes of the sensor."""
-        return {v["name"]: v["value"] for k, v in self._state.items()}
+        attributes = {v["name"]: v["value"] for k, v in self._state.items()}
+        attributes["device_info"] = self._device_info
+        attributes["tv_info"] = self._tv_info
+        return attributes
 
     async def async_update(self):
         """Get the latest data and updates the states."""
