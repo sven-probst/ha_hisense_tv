@@ -56,7 +56,15 @@ class HisenseTvSwitch(SwitchEntity, HisenseTvBase):
 
     async def async_turn_on(self, **kwargs):
         """Turn the entity on."""
-        wakeonlan.send_magic_packet(self._mac, ip_address=self._ip_address)
+        if not self._mac:
+            _LOGGER.error("MAC address is not set. Cannot send magic packet.")
+            return
+        if not self._ip_address:
+            _LOGGER.warning("IP address is not set. Using default broadcast address.")
+            wakeonlan.send_magic_packet(self._mac)
+        else:
+            wakeonlan.send_magic_packet(self._mac, ip_address=self._ip_address)
+
 
     async def async_turn_off(self, **kwargs):
         """Turn the entity off."""
