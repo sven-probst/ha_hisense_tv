@@ -1,5 +1,5 @@
 # Hisense TV Integration for Home Assistant
-# This is a fork from sehaas/ha_hisense_tv, with some merged changes and PRs.
+# This is a fork from sehaas/ha_hisense_tv and V4n1X/ha_hisense_tv, with some merged changes and PRs.
 
 Integration an Hisense TV as media player into Home Assistant. The communication is handled via the integrated MQTT broker and wake-on-LAN.
 Requires Home Assistant >= `2021.12.x`.

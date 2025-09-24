@@ -1,13 +1,13 @@
 {
   "domain": "hisense_tv",
   "name": "Hisense TV MQTT Bridge",
-  "version": "22.05.09",
-  "documentation": "https://github.com/sehaas/ha_hisense_tv",
+  "version": "v0.1.0",
+  "documentation": "https://github.com/sven-probst/ha_hisense_tv",
   "dependencies": [
     "mqtt"
   ],
   "codeowners": [
-    "@sehaas"
+    "@sven-probst"
   ],
   "requirements": [
     "wakeonlan==2.0.1"
