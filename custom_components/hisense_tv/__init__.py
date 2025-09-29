@@ -8,7 +8,7 @@ from homeassistant.components import mqtt
 from homeassistant.helpers import config_validation as cv
 import voluptuous as vol
 
-from .const import DOMAIN, SERVICE_SEND_KEY, ATTR_KEY, CONF_MQTT_OUT 
+from .const import DOMAIN, SERVICE_SEND_KEY, ATTR_KEY, CONF_MQTT_OUT, DEFAULT_CLIENT_ID
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,14 +37,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         key = call.data[ATTR_KEY]
 
         # Konstruiere das Topic
-        uid = entry.unique_id or entry.entry_id
+        client_id_for_topic = DEFAULT_CLIENT_ID 
         mqtt_out_prefix = entry.data.get(CONF_MQTT_OUT)
         if not mqtt_out_prefix:
             _LOGGER.error("CONF_MQTT_OUT Präfix nicht gefunden für Eintrag %s", entry.entry_id)
             return
 
-        formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{uid}/actions/sendkey"
+        formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
 
+        # Verwende den Home Assistant MQTT-Dienst zum Veröffentlichen
+        _LOGGER.debug("Publishing to topic: %s with payload: %s", formatted_topic, f"KEY_{key}") # Zusätzliches Debug-Logging
         # Verwende den Home Assistant MQTT-Dienst zum Veröffentlichen
         await mqtt.async_publish(
             hass=hass,
