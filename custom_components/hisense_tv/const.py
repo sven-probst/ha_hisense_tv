@@ -14,3 +14,4 @@ SERVICE_SEND_KEY = "send_key"
 
 # Service attributes
 ATTR_KEY = "key"
+ATTR_ENTITY_ID = "entity_id" # <-- NEU: Für die Auswahl der TV-Instanz

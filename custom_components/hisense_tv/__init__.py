@@ -6,9 +6,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.components import mqtt
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er # <-- NEU: Import für Entity Registry
 import voluptuous as vol
 
-from .const import DOMAIN, SERVICE_SEND_KEY, ATTR_KEY, CONF_MQTT_OUT, DEFAULT_CLIENT_ID
+from .const import DOMAIN, SERVICE_SEND_KEY, ATTR_KEY, ATTR_ENTITY_ID,CONF_MQTT_OUT, DEFAULT_CLIENT_ID
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,6 +18,7 @@ PLATFORMS = ["media_player", "switch", "sensor"]
 # Define the schema for the send_key service
 SEND_KEY_SCHEMA = vol.Schema(
     {
+        vol.Required(ATTR_ENTITY_ID): cv.entity_id, # <-- NEU: entity_id ist jetzt erforderlich
         vol.Required(ATTR_KEY): cv.string,
     }
 )
@@ -34,11 +36,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     async def async_send_key_service(call: ServiceCall):
         """Behandelt den send_key Dienstaufruf."""
         _LOGGER.debug("Dienst hisense_tv.send_key aufgerufen mit Daten: %s", call.data)
+        target_entity_id = call.data[ATTR_ENTITY_ID] # <-- NEU: entity_id aus dem Aufruf holen
         key = call.data[ATTR_KEY]
+
+        entity_registry = er.async_get(hass)
+        entity_entry = entity_registry.async_get(target_entity_id)
+
+        if not entity_entry:
+            _LOGGER.error("Entität %s nicht gefunden.", target_entity_id)
+            return
+        
+        if not entity_entry.config_entry_id:
+            _LOGGER.error("Entität %s ist keinem ConfigEntry zugeordnet.", target_entity_id)
+            return
+
+        target_config_entry = hass.config_entries.async_get_entry(entity_entry.config_entry_id)
+
+        if not target_config_entry:
+            _LOGGER.error("ConfigEntry für Entität %s nicht gefunden.", target_entity_id)
+            return
 
         # Konstruiere das Topic
         client_id_for_topic = DEFAULT_CLIENT_ID 
-        mqtt_out_prefix = entry.data.get(CONF_MQTT_OUT)
+        mqtt_out_prefix = target_config_entry.data.get(CONF_MQTT_OUT) # <-- NEU: mqtt_out_prefix vom Ziel-TV
         if not mqtt_out_prefix:
             _LOGGER.error("CONF_MQTT_OUT Präfix nicht gefunden für Eintrag %s", entry.entry_id)
             return

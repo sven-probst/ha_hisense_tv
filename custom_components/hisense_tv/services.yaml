@@ -1,0 +1,19 @@
+send_key:
+  name: Send Key
+  description: Sends a specific key command to a Hisense TV.
+  fields:
+    entity_id:
+      name: Target TV
+      description: The entity ID of the Hisense TV to send the key to (e.g., media_player.hisense_tv_wohnzimmer).
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          integration: hisense_tv
+    key:
+      name: Key
+      description: The key command to send (e.g., POWER, VOLUMEUP, MUTE, HOME, RED, SOURCE).
+      required: true
+      example: POWER
+      selector:
+        text:
