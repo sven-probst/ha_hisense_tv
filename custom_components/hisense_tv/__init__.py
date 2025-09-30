@@ -77,7 +77,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         # Die ursprüngliche Automatisierung hatte eine 300ms Verzögerung.
         # Der TV benötigt möglicherweise noch Zeit zur Verarbeitung.
         # Wenn nötig, kann der Benutzer diese Verzögerung in seiner Home Assistant Automatisierung hinzufügen.
-        await asyncio.sleep(0.3) # Optional: wenn der TV eine kleine Pause benötigt
+        # await asyncio.sleep(0.3) # Optional: wenn der TV eine kleine Pause benötigt
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_KEY, async_send_key_service, schema=SEND_KEY_SCHEMA
