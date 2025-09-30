@@ -12,7 +12,7 @@ send_key:
           integration: hisense_tv
     key:
       name: Key
-      description: The key command to send (e.g., POWER, VOLUMEUP, MUTE, HOME, RED, SOURCE).
+      description: The key command to send (e.g., UP, DOWN, HOME, 0, 1, MENU).
       required: true
       example: POWER
       selector:
