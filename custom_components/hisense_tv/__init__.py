@@ -60,7 +60,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         client_id_for_topic = DEFAULT_CLIENT_ID 
         mqtt_out_prefix = target_config_entry.data.get(CONF_MQTT_OUT) # <-- NEU: mqtt_out_prefix vom Ziel-TV
         if not mqtt_out_prefix:
-            _LOGGER.error("CONF_MQTT_OUT Präfix nicht gefunden für Eintrag %s", entry.entry_id)
+            _LOGGER.error("CONF_MQTT_OUT Präfix nicht gefunden für Eintrag %s (Entität: %s)", target_config_entry.entry_id, target_entity_id)
             return
 
         formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
