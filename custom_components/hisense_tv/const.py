@@ -11,7 +11,9 @@ DOMAIN = "hisense_tv"
 
 # Services
 SERVICE_SEND_KEY = "send_key"
+SERVICE_SEND_CHANNEL = "send_channel"
 
 # Service attributes
 ATTR_KEY = "key"
-ATTR_ENTITY_ID = "entity_id" # <-- NEU: Für die Auswahl der TV-Instanz
+ATTR_ENTITY_ID = "entity_id"
+ATTR_CHANNEL = "channel"

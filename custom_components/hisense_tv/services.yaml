@@ -1,19 +1,119 @@
 send_key:
-  name: Send Key
-  description: Sends a specific key command to a Hisense TV.
+  name: Send Key(s)
+  description: Sends one or more specific key commands to a Hisense TV.
   fields:
     entity_id:
       name: Target TV
-      description: The entity ID of the Hisense TV to send the key to (e.g., media_player.hisense_tv_wohnzimmer).
+      description: The entity ID of the Hisense TV to send the key(s) to (e.g., media_player.hisense_tv_wohnzimmer).
+      required: true
+      selector:
+        entity:
+          domain: media_player # Oder switch, je nachdem welche Entität du ansprechen willst
+          integration: hisense_tv
+    key:
+      name: Key(s)
+      description: The key command(s) to send. Can be a single key or a list of keys.
+      required: true
+      example: POWER
+      selector:
+        select:
+          multiple: true # <-- HIER DIE ÄNDERUNG: Erlaubt Mehrfachauswahl für Sequenzen
+          options:
+            - label: Power
+              value: POWER
+            - label: Volume Up
+              value: VOLUMEUP
+            - label: Volume Down
+              value: VOLUMEDOWN
+            - label: Mute
+              value: MUTE
+            - label: Channel Up
+              value: CHANNELUP
+            - label: Channel Down
+              value: CHANNELDOWN
+            - label: Home
+              value: HOME
+            - label: Menu
+              value: MENU
+            - label: Back
+              value: BACK
+            - label: Exit
+              value: EXIT
+            - label: Source
+              value: SOURCE
+            - label: Info
+              value: INFO
+            - label: Red Button
+              value: RED
+            - label: Green Button
+              value: GREEN
+            - label: Yellow Button
+              value: YELLOW
+            - label: Blue Button
+              value: BLUE
+            - label: Up Arrow
+              value: UP
+            - label: Down Arrow
+              value: DOWN
+            - label: Left Arrow
+              value: LEFT
+            - label: Right Arrow
+              value: RIGHT
+            - label: Select (OK)
+              value: SELECT
+            - label: Play
+              value: PLAY
+            - label: Pause
+              value: PAUSE
+            - label: Stop
+              value: STOP
+            - label: Rewind
+              value: REWIND
+            - label: Fast Forward
+              value: FASTFORWARD
+            - label: Record
+              value: RECORD
+            - label: Number 0
+              value: NUM0
+            - label: Number 1
+              value: NUM1
+            - label: Number 2
+              value: NUM2
+            - label: Number 3
+              value: NUM3
+            - label: Number 4
+              value: NUM4
+            - label: Number 5
+              value: NUM5
+            - label: Number 6
+              value: NUM6
+            - label: Number 7
+              value: NUM7
+            - label: Number 8
+              value: NUM8
+            - label: Number 9
+              value: NUM9
+            # Füge hier weitere Keys hinzu
+
+send_channel: # NEU: Dienstdefinition für send_channel
+  name: Send Channel
+  description: Sends a channel number to a Hisense TV by sending individual digits.
+  fields:
+    entity_id:
+      name: Target TV
+      description: The entity ID of the Hisense TV to send the channel to.
       required: true
       selector:
         entity:
           domain: media_player
           integration: hisense_tv
-    key:
-      name: Key
-      description: The key command to send (e.g., UP, DOWN, HOME, 0, 1, MENU).
+    channel:
+      name: Channel Number
+      description: The channel number to send (e.g., 1, 10, 101).
       required: true
-      example: POWER
+      example: 101
       selector:
-        text:
+        number:
+          min: 0
+          max: 9999 # Max. Kanalnummer nach Bedarf anpassen
+          mode: whole # Nur ganze Zahlen erlauben
