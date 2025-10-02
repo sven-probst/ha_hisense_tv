@@ -15,6 +15,7 @@ from .const import (
     SERVICE_SEND_CHANNEL,
     ATTR_KEY,
     ATTR_ENTITY_ID,
+    ATTR_CHANNEL,
     CONF_MQTT_OUT,
     DEFAULT_CLIENT_ID,
     )
