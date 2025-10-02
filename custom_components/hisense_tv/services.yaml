@@ -60,8 +60,8 @@ send_key:
               value: LEFT
             - label: Right Arrow
               value: RIGHT
-            - label: Select (OK)
-              value: SELECT
+            - label: OK
+              value: OK
             - label: Play
               value: PLAY
             - label: Pause
