@@ -126,7 +126,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey" 
 
         for digit in channel_number:
-            key_payload = f"KEY_NUM{digit}" # z.B. KEY_NUM1, KEY_NUM2
+            key_payload = f"KEY_{digit}" # z.B. KEY_1, KEY_2
             _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, key_payload, target_entity_id)
             await mqtt.async_publish(
                 hass=hass,

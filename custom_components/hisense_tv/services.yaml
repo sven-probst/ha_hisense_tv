@@ -75,25 +75,25 @@ send_key:
             - label: Record
               value: RECORD
             - label: Number 0
-              value: NUM0
+              value: 0
             - label: Number 1
-              value: NUM1
+              value: 1
             - label: Number 2
-              value: NUM2
+              value: 2
             - label: Number 3
-              value: NUM3
+              value: 3
             - label: Number 4
-              value: NUM4
+              value: 4
             - label: Number 5
-              value: NUM5
+              value: 5
             - label: Number 6
-              value: NUM6
+              value: 6
             - label: Number 7
-              value: NUM7
+              value: 7
             - label: Number 8
-              value: NUM8
+              value: 8
             - label: Number 9
-              value: NUM9
+              value: 9
             # Füge hier weitere Keys hinzu
 
 send_channel:
