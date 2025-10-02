@@ -17,7 +17,7 @@ send_key:
       example: POWER
       selector:
         select:
-          multiple: true # <-- HIER DIE ÄNDERUNG: Erlaubt Mehrfachauswahl für Sequenzen
+          multiple: true
           options:
             - label: Power
               value: POWER
@@ -95,7 +95,7 @@ send_key:
               value: NUM9
             # Füge hier weitere Keys hinzu
 
-send_channel: # NEU: Dienstdefinition für send_channel
+send_channel:
   name: Send Channel
   description: Sends a channel number to a Hisense TV by sending individual digits.
   fields:
@@ -116,4 +116,3 @@ send_channel: # NEU: Dienstdefinition für send_channel
         number:
           min: 0
           max: 9999 # Max. Kanalnummer nach Bedarf anpassen
-          mode: whole # Nur ganze Zahlen erlauben
