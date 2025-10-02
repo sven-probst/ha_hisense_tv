@@ -4,6 +4,7 @@ send_key:
   fields:
     entity_id:
       name: Target TV
+      example: media_player.hisense_tv_livingroom
       description: The entity ID of the Hisense TV to send the key(s) to (e.g., media_player.hisense_tv_wohnzimmer).
       required: true
       selector:
