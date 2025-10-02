@@ -75,30 +75,30 @@ send_key:
             - label: Record
               value: RECORD
             - label: Number 0
-              value: 0
+              value: '0'
             - label: Number 1
-              value: 1
+              value: '1'
             - label: Number 2
-              value: 2
+              value: '2'
             - label: Number 3
-              value: 3
+              value: '3'
             - label: Number 4
-              value: 4
+              value: '4'
             - label: Number 5
-              value: 5
+              value: '5'
             - label: Number 6
-              value: 6
+              value: '6'
             - label: Number 7
-              value: 7
+              value: '7'
             - label: Number 8
-              value: 8
+              value: '8'
             - label: Number 9
-              value: 9
+              value: '9'
             # Füge hier weitere Keys hinzu
 
 send_channel:
   name: Send Channel
-  description: Sends a channel number to a Hisense TV by sending individual digits.
+  description: Sends a channel number to a Hisense TV by sending an EXIT command first, then individual digits.
   fields:
     entity_id:
       name: Target TV
