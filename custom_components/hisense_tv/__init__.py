@@ -103,7 +103,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 retain=False,
             )
             # Eine kleine Verzögerung zwischen den Tasten in einer Sequenz ist wichtig
-            await asyncio.sleep(0.3) 
+            await asyncio.sleep(0.4) 
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_KEY, async_send_key_service, schema=SEND_KEY_SCHEMA
