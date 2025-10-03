@@ -101,7 +101,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 topic=formatted_topic,
                 payload=payload,
                 retain=False,
-            
+            )
             # Eine kleine Verzögerung zwischen den Tasten in einer Sequenz ist wichtig
             await asyncio.sleep(0.7) 
 
