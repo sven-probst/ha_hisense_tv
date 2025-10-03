@@ -16,9 +16,9 @@ Requires Home Assistant >= `2021.12.x`.
   * Channel selector
   * Apps
 * Read picture setting
+* send keys as single or as sequence from a array via action
 
 TBD:
-* Expose ON/OFF as switch
 * Expose all keys as buttons
 * Enhance EPG/guide handling
 

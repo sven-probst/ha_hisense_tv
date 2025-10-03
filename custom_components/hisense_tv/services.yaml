@@ -36,8 +36,8 @@ send_key:
               value: HOME
             - label: Menu
               value: MENU
-            - label: Back
-              value: BACK
+            - label: Returns (Back)
+              value: RETURNS
             - label: Exit
               value: EXIT
             - label: Source
@@ -68,10 +68,10 @@ send_key:
               value: PAUSE
             - label: Stop
               value: STOP
-            - label: Rewind
-              value: REWIND
-            - label: Fast Forward
-              value: FASTFORWARD
+            - label: Back (rewind)
+              value: BACK
+            - label: Forward (fast forward)
+              value: FORWARDS
             - label: Record
               value: RECORD
             - label: Number 0
