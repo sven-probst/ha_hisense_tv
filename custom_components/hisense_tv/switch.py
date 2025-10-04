@@ -3,9 +3,10 @@ import logging
 
 import wakeonlan
 
-from homeassistant.components import mqtt
+from homeassistant.components import mqtt, switch
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
-from homeassistant.const import CONF_IP_ADDRESS, CONF_MAC, CONF_NAME
+from homeassistant.const import (CONF_IP_ADDRESS, CONF_MAC, CONF_NAME, STATE_OFF,
+                                 STATE_STANDBY)
 
 from .const import CONF_MQTT_IN, CONF_MQTT_OUT, DEFAULT_NAME, DOMAIN
 from .helper import HisenseTvBase
@@ -54,30 +55,69 @@ class HisenseTvSwitch(SwitchEntity, HisenseTvBase):
         )
         self._is_on = False
 
+    @property
+    def is_on(self):
+        """Return true if switch is on."""
+        return self._is_on
+
+    def _get_media_player_state(self):
+        """Get the state of the associated media_player entity."""
+        entity_registry = self.hass.helpers.entity_registry.async_get(self.hass)
+        media_player_entity_id = entity_registry.async_get_entity_id(
+            "media_player", DOMAIN, self.unique_id
+        )
+        if media_player_entity_id:
+            if (state := self.hass.states.get(media_player_entity_id)):
+                return state.state
+        return STATE_OFF  # Fallback if state cannot be determined
+
     async def async_turn_on(self, **kwargs):
         """Turn the entity on."""
-        if not self._mac:
-            _LOGGER.error("MAC address is not set. Cannot send magic packet.")
-            return
-        if not self._ip_address:
-            _LOGGER.warning("IP address is not set. Using default broadcast address.")
-            wakeonlan.send_magic_packet(self._mac)
-        else:
-            wakeonlan.send_magic_packet(self._mac, ip_address=self._ip_address)
+        current_state = self._get_media_player_state()
 
+        if current_state not in (STATE_OFF, STATE_STANDBY):
+            _LOGGER.debug("Switch is already on, not sending any command.")
+            return
+
+        if current_state == STATE_STANDBY:
+            _LOGGER.debug("Sending KEY_POWER to turn on TV from standby.")
+            await mqtt.async_publish(
+                hass=self._hass,
+                topic=self._out_topic("/remoteapp/tv/remote_service/%s/actions/sendkey"),
+                payload="KEY_POWER",
+                retain=False,
+            )
+        else:  # current_state is STATE_OFF
+            if not self._mac:
+                _LOGGER.error("MAC address is not set. Cannot send magic packet.")
+                return
+
+            _LOGGER.debug("Sending WoL packet to turn on TV from deep sleep.")
+            if self._ip_address:
+                wakeonlan.send_magic_packet(self._mac, ip_address=self._ip_address)
+            else:
+                wakeonlan.send_magic_packet(self._mac)
+
+    async def async_toggle(self, **kwargs):
+        """Toggle the entity."""
+        if self.is_on:
+            await self.async_turn_off(**kwargs)
+        else:
+            await self.async_turn_on(**kwargs)
 
     async def async_turn_off(self, **kwargs):
         """Turn the entity off."""
+        if not self.is_on:
+            _LOGGER.debug("Switch is already off/standby, not sending power key.")
+            return
+
+        _LOGGER.debug("Sending KEY_POWER to turn off TV.")
         await mqtt.async_publish(
             hass=self._hass,
             topic=self._out_topic("/remoteapp/tv/remote_service/%s/actions/sendkey"),
             payload="KEY_POWER",
             retain=False,
         )
-
-    @property
-    def is_on(self):
-        return self._is_on
 
     @property
     def device_info(self):
@@ -115,44 +155,27 @@ class HisenseTvSwitch(SwitchEntity, HisenseTvBase):
             unsubscribe()
 
     async def async_added_to_hass(self):
+        """Subscribe to MQTT events."""
         self._subscriptions["tvsleep"] = await mqtt.async_subscribe(
             self._hass,
             self._in_topic(
                 "/remoteapp/mobile/broadcast/platform_service/actions/tvsleep"
             ),
-            self._message_received_turnoff,
+            self.async_update_state,
         )
 
         self._subscriptions["state"] = await mqtt.async_subscribe(
             self._hass,
             self._in_topic("/remoteapp/mobile/broadcast/ui_service/state"),
-            self._message_received_state,
+            self.async_update_state,
         )
 
-        self._subscriptions["volume"] = await mqtt.async_subscribe(
-            self._hass,
-            self._in_topic(
-                "/remoteapp/mobile/broadcast/platform_service/actions/volumechange"
-            ),
-            self._message_received_state,
-        )
+        # Schedule a state update on startup to get the initial state
+        self.async_schedule_update_ha_state(force_refresh=True)
 
-        self._subscriptions["sourcelist"] = await mqtt.async_subscribe(
-            self._hass,
-            self._out_topic("/remoteapp/mobile/%s/ui_service/data/sourcelist"),
-            self._message_received_state,
-        )
-
-    async def _message_received_turnoff(self, msg):
-        _LOGGER.debug("message_received_turnoff")
-        self._is_on = False
-        self.async_write_ha_state()
-
-    async def _message_received_state(self, msg):
-        if msg.retain:
-            _LOGGER.debug("SWITCH message_received_state - skip retained message")
-            return
-
-        _LOGGER.debug("SWITCH message_received_state - turn on")
-        self._is_on = True
+    async def async_update_state(self, msg=None):
+        """Update the state of the switch and request a HA state update."""
+        new_state = self._get_media_player_state()
+        self._is_on = new_state not in (STATE_OFF, STATE_STANDBY)
+        _LOGGER.debug("Switch state updated to '%s' based on media_player state '%s'", self._is_on, new_state)
         self.async_write_ha_state()
