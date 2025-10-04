@@ -1,14 +1,17 @@
 """Hisense TV switch entity"""
 import logging
 
-import wakeonlan
+from homeassistant.components.media_player import SERVICE_TURN_OFF
 
-from homeassistant.components import mqtt
+from homeassistant.components import mqtt, switch
+from homeassistant.components.media_player import DOMAIN as MEDIA_PLAYER_DOMAIN, SERVICE_TURN_ON
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
-from homeassistant.const import CONF_IP_ADDRESS, CONF_MAC, CONF_NAME
+from homeassistant.const import (CONF_IP_ADDRESS, CONF_MAC, CONF_NAME, STATE_OFF,
+                                 STATE_STANDBY, ATTR_ENTITY_ID, EVENT_HOMEASSISTANT_START)
+from homeassistant.core import callback, Event
+from homeassistant.helpers import device_registry as dr, entity_registry as er, event
 
 from .const import CONF_MQTT_IN, CONF_MQTT_OUT, DEFAULT_NAME, DOMAIN
-from .helper import HisenseTvBase
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,88 +20,94 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     """Start HisenseTV switch setup process."""
     _LOGGER.debug("async_setup_entry config: %s", config_entry.data)
 
-    name = config_entry.data[CONF_NAME]
-    mac = config_entry.data[CONF_MAC]
-    ip_address = config_entry.data.get(CONF_IP_ADDRESS, wakeonlan.BROADCAST_IP)
-    mqtt_in = config_entry.data[CONF_MQTT_IN]
-    mqtt_out = config_entry.data[CONF_MQTT_OUT]
     uid = config_entry.unique_id
     if uid is None:
         uid = config_entry.entry_id
 
     entity = HisenseTvSwitch(
-        hass=hass,
-        name=name,
-        mqtt_in=mqtt_in,
-        mqtt_out=mqtt_out,
-        mac=mac,
+        hass=hass,        
+        name=config_entry.data[CONF_NAME],
         uid=uid,
-        ip_address=ip_address,
     )
     async_add_entities([entity])
 
 
-class HisenseTvSwitch(SwitchEntity, HisenseTvBase):
+class HisenseTvSwitch(SwitchEntity):
     """Hisense TV switch entity."""
 
-    def __init__(self, hass, name, mqtt_in, mqtt_out, mac, uid, ip_address):
-        HisenseTvBase.__init__(
-            self=self,
-            hass=hass,
-            name=name,
-            mqtt_in=mqtt_in,
-            mqtt_out=mqtt_out,
-            mac=mac,
-            uid=uid,
-            ip_address=ip_address,
-        )
+    def __init__(self, hass, name, uid):
+        # The switch entity is simpler and primarily delegates to the media_player.
+        # It doesn't need its own MQTT subscriptions or a full HisenseTvBase initialization.
+        self._hass = hass
+        self._name = name
+        self._device_unique_id = uid # Store the device's unique_id for lookups
+        self._attr_name = f"{name} Power"
+        self._attr_unique_id = f"{uid}_power"
         self._is_on = False
-
-    async def async_turn_on(self, **kwargs):
-        """Turn the entity on."""
-        if not self._mac:
-            _LOGGER.error("MAC address is not set. Cannot send magic packet.")
-            return
-        if not self._ip_address:
-            _LOGGER.warning("IP address is not set. Using default broadcast address.")
-            wakeonlan.send_magic_packet(self._mac)
-        else:
-            wakeonlan.send_magic_packet(self._mac, ip_address=self._ip_address)
-
-
-    async def async_turn_off(self, **kwargs):
-        """Turn the entity off."""
-        await mqtt.async_publish(
-            hass=self._hass,
-            topic=self._out_topic("/remoteapp/tv/remote_service/%s/actions/sendkey"),
-            payload="KEY_POWER",
-            retain=False,
-        )
+        self._attr_icon = "mdi:power"
+        self._media_player_entity_id = None
 
     @property
     def is_on(self):
+        """Return true if switch is on."""
         return self._is_on
+
+    def _get_media_player_state(self):
+        """Get the state of the associated media_player entity."""
+        entity_registry = er.async_get(self.hass)
+        if not self._media_player_entity_id:
+            self._media_player_entity_id = entity_registry.async_get_entity_id("media_player", DOMAIN, self._device_unique_id)
+
+        if self._media_player_entity_id and (state := self.hass.states.get(self._media_player_entity_id)):
+            return state.state
+        return STATE_OFF  # Fallback if state cannot be determined
+
+    def _get_media_player_entity(self):
+        """Get the media_player entity object."""
+        entity_registry = er.async_get(self.hass)
+        if not self._media_player_entity_id:
+            self._media_player_entity_id = entity_registry.async_get_entity_id("media_player", DOMAIN, self._device_unique_id)
+
+        if self._media_player_entity_id:
+            return self.hass.data["media_player"].get_entity(self._media_player_entity_id)
+        
+        _LOGGER.error("Could not find the hisense_tv media_player for device with unique_id '%s'.", self.unique_id)
+        return None
+
+    async def async_turn_on(self, **kwargs):
+        """Turn the entity on."""
+        media_player = self._get_media_player_entity()
+        if not media_player:
+            return
+
+        _LOGGER.debug("Calling async_turn_on for media_player: %s", media_player.entity_id)
+        await media_player.async_turn_on()
+    
+        # Optimistically set the state to on.
+        self._is_on = True
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs):
+        """Turn the entity off."""
+        media_player = self._get_media_player_entity()
+        if not media_player:
+            return
+
+        _LOGGER.debug("Calling async_turn_off for media_player: %s", media_player.entity_id)
+        await media_player.async_turn_off()
+
+        # Optimistically set the state to off.
+        self._is_on = False
+        self.async_write_ha_state()
 
     @property
     def device_info(self):
+        # The switch entity shares device info with the media_player
         return {
-            "identifiers": {(DOMAIN, self._unique_id)},
-            "name": self._name,
-            "manufacturer": DEFAULT_NAME,
+            "identifiers": {(DOMAIN, self._device_unique_id)},
+            # By linking to the domain and unique_id, this entity will be automatically
+            # associated with the device created by the media_player entity.
         }
-
-    @property
-    def unique_id(self):
-        """Return the unique id of the device."""
-        return self._unique_id
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def icon(self):
-        return self._icon
 
     @property
     def device_class(self):
@@ -110,49 +119,36 @@ class HisenseTvSwitch(SwitchEntity, HisenseTvBase):
         """No polling needed."""
         return False
 
-    async def async_will_remove_from_hass(self):
-        for unsubscribe in list(self._subscriptions.values()):
-            unsubscribe()
+    @callback
+    def _async_update_state(self, event: Event | None = None) -> None:
+        """Update the switch's state based on the media_player's state."""
+        media_player_state = self._get_media_player_state()
+        new_state = media_player_state not in (STATE_OFF, STATE_STANDBY, None)
+        
+        if self._is_on != new_state:
+            _LOGGER.debug("Switch state updated to '%s' based on media_player state '%s'", new_state, media_player_state)
+            self._is_on = new_state
+            self.async_write_ha_state()
 
     async def async_added_to_hass(self):
-        self._subscriptions["tvsleep"] = await mqtt.async_subscribe(
-            self._hass,
-            self._in_topic(
-                "/remoteapp/mobile/broadcast/platform_service/actions/tvsleep"
-            ),
-            self._message_received_turnoff,
-        )
+        """Run when entity about to be added to hass, and register state change listener."""
+        await super().async_added_to_hass()
 
-        self._subscriptions["state"] = await mqtt.async_subscribe(
-            self._hass,
-            self._in_topic("/remoteapp/mobile/broadcast/ui_service/state"),
-            self._message_received_state,
-        )
+        # Get the media_player entity_id
+        entity_registry = er.async_get(self.hass)
+        self._media_player_entity_id = entity_registry.async_get_entity_id("media_player", DOMAIN, self._device_unique_id)
 
-        self._subscriptions["volume"] = await mqtt.async_subscribe(
-            self._hass,
-            self._in_topic(
-                "/remoteapp/mobile/broadcast/platform_service/actions/volumechange"
-            ),
-            self._message_received_state,
-        )
-
-        self._subscriptions["sourcelist"] = await mqtt.async_subscribe(
-            self._hass,
-            self._out_topic("/remoteapp/mobile/%s/ui_service/data/sourcelist"),
-            self._message_received_state,
-        )
-
-    async def _message_received_turnoff(self, msg):
-        _LOGGER.debug("message_received_turnoff")
-        self._is_on = False
-        self.async_write_ha_state()
-
-    async def _message_received_state(self, msg):
-        if msg.retain:
-            _LOGGER.debug("SWITCH message_received_state - skip retained message")
+        if not self._media_player_entity_id:
+            _LOGGER.warning("Could not find the hisense_tv media_player for device with unique_id '%s'.", self._device_unique_id)
             return
 
-        _LOGGER.debug("SWITCH message_received_state - turn on")
-        self._is_on = True
-        self.async_write_ha_state()
+        # Listen for state changes of the media_player
+        self.async_on_remove(
+            event.async_track_state_change_event(
+                self.hass, self._media_player_entity_id, self._async_update_state
+            )
+        )
+
+        # Update state on startup
+        self.async_on_remove(self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_START, self._async_update_state))
+        self._async_update_state()

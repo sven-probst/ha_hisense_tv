@@ -4,17 +4,42 @@
         "step": {
             "user": {
                 "data": {
-                    "name": "TV Name",
+                    "name": "Name (e.g., Living Room TV)",
                     "mac": "WakeOnLAN MAC Address",
                     "ip_address": "WakeOnLAN IP Address",
                     "mqtt_in": "MQTT subscription prefix",
-                    "mqtt_out": "MQTT publish prefix"
+                    "mqtt_out": "MQTT publish prefix",
+                    "enable_polling": "Enable polling for status updates"
                 }
             },
             "authentication": {
                 "data": {
                     "pin": "PIN Code"
-                }
+                },
+                "description": "Please enter the PIN code displayed on your TV screen to complete the authentication."
+            }
+        },
+        "abort": {
+            "not_vidaa_device": "The discovered device does not appear to be a VIDAA-compatible Hisense TV. The integration may not work correctly.",
+            "cannot_get_mac": "Could not determine the MAC address of the device from its description. It cannot be uniquely identified.",
+            "not_hisense_device": "The device does not seem to be a Hisense TV.",
+            "cannot_connect": "Could not connect to the TV to get device information. Please check if the TV is online and reachable.",
+            "cannot_parse_xml": "The device returned an invalid description file (XML).",
+            "auth_timeout": "Authentication timed out. Please try again."
+        },
+        "error": {
+            "invalid_auth": "Invalid PIN code. Please try again."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Hisense TV Options",
+                "data": {
+                    "mqtt_in": "MQTT subscription prefix",
+                    "mqtt_out": "MQTT publish prefix"
+                },
+                "description": "Adjust the settings for your Hisense TV. Changes will trigger a reload of the integration."
             }
         }
     }

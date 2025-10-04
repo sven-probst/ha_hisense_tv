@@ -31,10 +31,14 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
     entity = HisenseTvSensor(
         hass=hass,
+        # The name will be set by the entity itself.
+        # We pass the base name from the config.
         name=name,
         mqtt_in=mqtt_in,
         mqtt_out=mqtt_out,
         mac=mac,
+        # Use the same unique_id as the media_player to link them to the same device.
+        # The sensor's unique identity will be defined by its name/object_id.
         uid=uid,
         ip_address=ip_address,
     )
@@ -45,8 +49,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
     """Representation of a sensor that can be updated using MQTT."""
 
     def __init__(self, hass, name, mqtt_in, mqtt_out, mac, uid, ip_address):
-        HisenseTvBase.__init__(
-            self=self,
+        super().__init__(
             hass=hass,
             name=name,
             mqtt_in=mqtt_in,
@@ -55,6 +58,10 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             uid=uid,
             ip_address=ip_address,
         )
+        # This will be the name of the sensor entity.
+        self._attr_name = f"{name} Picture Settings"
+        # This ensures the entity has a unique ID within the device.
+        self._attr_unique_id = f"{uid}_picturesettings"
         self._is_available = False
         self._state = {}
         self._device_info = {}  # store "getdeviceinfo"
@@ -109,6 +116,18 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             self._message_received_deviceinfo,
         )
 
+        # Proactively request picture settings when the entity is added.
+        # This ensures the sensor becomes available if the TV is already on.
+        _LOGGER.debug("Proactively requesting picture settings for sensor.")
+        await mqtt.async_publish(
+            hass=self._hass,
+            topic=self._out_topic(
+                "/remoteapp/tv/platform_service/%s/actions/picturesetting"
+            ),
+            payload="",
+            retain=False,
+        )
+
 
     async def _message_received_turnoff(self, msg):
         _LOGGER.debug("message_received_turnoff")
@@ -152,7 +171,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             _LOGGER.warning("error parsing 'getdeviceinfo': %s", msg.payload)
             return
 
-        _LOGGER.debug("Deviceinfo empfangen: %s", payload)
+        _LOGGER.debug("Received deviceinfo: %s", payload)
         self._device_info = payload
         self.async_write_ha_state()    
 
@@ -164,7 +183,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             _LOGGER.warning("error parsing 'gettvinfo': %s", msg.payload)
             return
 
-        _LOGGER.debug("tvinfo empfangen: %s", payload)
+        _LOGGER.debug("Received tvinfo: %s", payload)
         self._tv_info = payload
         self.async_write_ha_state()   
 
@@ -201,14 +220,9 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         self.async_write_ha_state()
 
     @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
-
-    @property
     def native_value(self):
-        """Return the state of the sensor."""
-        return self._state.get(91, {}).get("value", "")
+        """Return the number of picture settings found as the state."""
+        return len(self._state) if self._is_available else None
 
     @property
     def available(self):
@@ -216,49 +230,23 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         return self._is_available
 
     @property
-    def icon(self):
-        """Return the icon to use in the frontend, if any."""
-        return self._icon
-
-    @property
     def extra_state_attributes(self):
         """Return the state attributes of the sensor."""
-        attributes = {v["name"]: v["value"] for k, v in self._state.items()}
+        attributes = {v["name"]: v["value"] for v in self._state.values()}
         attributes["device_info"] = self._device_info
+        attributes["ip_address"] = self._ip_address
         attributes["tv_info"] = self._tv_info
         return attributes
 
-    async def async_update(self):
-        """Get the latest data and updates the states."""
-        if (
-            not self._force_trigger
-            and dt_util.utcnow() - self._last_trigger < timedelta(minutes=1)
-        ):
-            _LOGGER.debug("Skip update")
-            return
-
-        _LOGGER.debug("Update. force=%s", self._force_trigger)
-        self._force_trigger = False
-        self._last_trigger = dt_util.utcnow()
-
-        await mqtt.async_publish(
-            hass=self._hass,
-            topic=self._out_topic(
-                "/remoteapp/tv/ui_service/%s/actions/gettvstate"
-            ),
-            payload='',
-            retain=False,
-        )
-
     @property
     def device_info(self):
+        """Return the device info for the sensor."""
+        # This links the sensor to the main media_player device.
         return {
             "identifiers": {(DOMAIN, self._unique_id)},
-            "name": self._name,
-            "manufacturer": DEFAULT_NAME,
         }
 
-    @property
-    def unique_id(self):
-        """Return the unique id of the device."""
-        return self._unique_id
+    async def async_update(self):
+        """Update is handled by MQTT subscriptions, not polling. But we can request an update."""
+        _LOGGER.debug("async_update called for sensor")
+        self._force_trigger = True

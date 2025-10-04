@@ -15,28 +15,28 @@ async def mqtt_pub_sub(hass, pub, sub, payload=""):
     loop = asyncio.get_event_loop()
     queue = asyncio.Queue()
 
-    _LOGGER.debug("MQTT pub/sub gestartet: pub='%s', sub='%s', payload='%s'", pub, sub, payload)
+    _LOGGER.debug("MQTT pub/sub started: pub='%s', sub='%s', payload='%s'", pub, sub, payload)
 
     def put(*args):
-        _LOGGER.debug("MQTT Nachricht empfangen (Callback): %s", args)
+        _LOGGER.debug("MQTT message received (Callback): %s", args)
         loop.call_soon_threadsafe(queue.put_nowait, args)
 
     async def get():
         while True:
 
             try:
-                _LOGGER.debug("Warte auf Nachricht auf Topic '%s'...", sub)
+                _LOGGER.debug("Waiting for message on topic '%s'...", sub)
                 message = await asyncio.wait_for(queue.get(), timeout=10)
-                _LOGGER.debug("Nachricht erhalten: %s", message)
+                _LOGGER.debug("Message received: %s", message)
                 yield message
             except asyncio.TimeoutError:
-                _LOGGER.warning("Timeout: keine Nachricht innerhalb von 10 Sekunden auf Topic '%s'", sub)
-                yield None  # Optional: abbrechen mit `return` statt `yield None`
+                _LOGGER.warning("Timeout: no message on topic '%s' within 10 seconds", sub)
+                yield None  # Optional: cancel with `return` instead of `yield None`
 
     _LOGGER.debug("Subscribing to topic: '%s'", sub)
     unsubscribe = await mqtt.async_subscribe(hass=hass, topic=sub, msg_callback=put)
     await asyncio.sleep(0.1)
-    _LOGGER.debug("Publishing to topic: '%s' mit Payload: %s", pub, payload)
+    _LOGGER.debug("Publishing to topic: '%s' with payload: %s", pub, payload)
     await mqtt.async_publish(hass=hass, topic=pub, payload=payload)
     return get(), unsubscribe
 

@@ -8,12 +8,27 @@
                     "mac": "[%key:common::config_flow::data::mac%]",
                     "ip_address": "[%key:common::config_flow::data::ip_address%]",
                     "mqtt_in": "[%key:common::config_flow::data::mqtt_in%]",
-                    "mqtt_out": "[%key:common::config_flow::data::mqtt_out%]"
+                    "mqtt_out": "[%key:common::config_flow::data::mqtt_out%]",
+                    "enable_polling": "[%key:component::hisense_tv::config::step::user::data::enable_polling%]"
                 }
             },
             "auth": {
                 "data": {
                     "pin": "[%key:common::config_flow::data::pin%]"
+                }
+            }
+        },
+        "options": {
+            "step": {
+                "init": {
+                    "title": "[%key:component::hisense_tv::options::step::init::title%]",
+                    "data": {
+                        "ip_address": "[%key:common::config_flow::data::ip_address%]",
+                        "mqtt_in": "[%key:component::hisense_tv::options::step::init::data::mqtt_in%]",
+                        "mqtt_out": "[%key:component::hisense_tv::options::step::init::data::mqtt_out%]",
+                        "enable_polling": "[%key:component::hisense_tv::config::step::user::data::enable_polling%]"
+                    },
+                    "description": "[%key:component::hisense_tv::options::step::init::description%]"
                 }
             }
         }

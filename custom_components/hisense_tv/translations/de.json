@@ -1,0 +1,46 @@
+{
+    "title": "Hisense TV",
+    "config": {
+        "step": {
+            "user": {
+                "data": {
+                    "name": "Name (z.B. Wohnzimmer-Fernseher)",
+                    "mac": "WakeOnLAN MAC-Adresse",
+                    "ip_address": "WakeOnLAN IP-Adresse",
+                    "mqtt_in": "MQTT Subscription-Präfix",
+                    "mqtt_out": "MQTT Publish-Präfix",
+                    "enable_polling": "Aktiviere Polling für Status-Updates"
+                }
+            },
+            "authentication": {
+                "data": {
+                    "pin": "PIN-Code"
+                },
+                "description": "Bitte geben Sie den auf Ihrem Fernsehbildschirm angezeigten PIN-Code ein, um die Authentifizierung abzuschließen."
+            }
+        },
+        "abort": {
+            "not_vidaa_device": "Das gefundene Gerät scheint kein VIDAA-kompatibler Hisense-Fernseher zu sein. Die Integration funktioniert möglicherweise nicht korrekt.",
+            "cannot_get_mac": "Die MAC-Adresse des Geräts konnte aus der Beschreibung nicht ermittelt werden. Es kann nicht eindeutig identifiziert werden.",
+            "not_hisense_device": "Das Gerät scheint kein Hisense-Fernseher zu sein.",
+            "cannot_connect": "Es konnte keine Verbindung zum Fernseher hergestellt werden, um Geräteinformationen abzurufen. Bitte prüfen Sie, ob der Fernseher online und erreichbar ist.",
+            "cannot_parse_xml": "Das Gerät hat eine ungültige Beschreibungsdatei (XML) zurückgegeben.",
+            "auth_timeout": "Zeitüberschreitung bei der Authentifizierung. Bitte versuchen Sie es erneut."
+        },
+        "error": {
+            "invalid_auth": "Ungültiger PIN-Code. Bitte versuchen Sie es erneut."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Hisense TV Optionen",
+                "data": {
+                    "mqtt_in": "MQTT Subscription-Präfix",
+                    "mqtt_out": "MQTT Publish-Präfix"
+                },
+                "description": "Passe die Einstellungen für deinen Hisense TV an. Änderungen führen zu einem Neustart der Integration."
+            }
+        }
+    }
+}
