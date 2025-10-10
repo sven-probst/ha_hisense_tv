@@ -6,6 +6,11 @@
     "mqtt",
     "ssdp"
   ],
+  "ssdp": [
+    {
+      "st": "urn:schemas-upnp-org:device:MediaRenderer:1"
+    }
+  ],
   "documentation": "https://github.com/sven-probst/ha_hisense_tv/blob/main/README.md",
   "issue_tracker": "https://github.com/sven-probst/ha_hisense_tv/issues",
   "codeowners": ["@sven-probst"],
