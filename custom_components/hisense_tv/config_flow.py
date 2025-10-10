@@ -66,20 +66,26 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # We parse the XML and look for it.
         try:
             root = ET.fromstring(xml_content)
-            # Find the spec string, which can be in different namespaces
-            # The .find() method with local-name() is not supported by all xml parsers.
-            # We iterate through all elements to find the one with the local name 'X_spec'.
-            spec_node = None
+            spec_string = None
+
+            # First, try to find the Hisense-specific 'X_spec' tag.
             for elem in root.iter():
                 if elem.tag.endswith("X_spec"):
-                    spec_node = elem
+                    spec_string = elem.text
                     break
+            
+            # If 'X_spec' is not found, fall back to the standard 'modelDescription' tag.
+            if not spec_string:
+                # The default namespace makes finding tags tricky. We search for the local name.
+                for elem in root.iter():
+                    if elem.tag.endswith("modelDescription"):
+                        spec_string = elem.text
+                        break
 
-            if spec_node is None:
-                _LOGGER.debug("No X_spec node found in XML, aborting discovery.")
+            if not spec_string:
+                _LOGGER.debug("No X_spec or modelDescription node found in XML, aborting discovery.")
                 return self.async_abort(reason="not_hisense_device")
             
-            spec_string = spec_node.text
         except ET.ParseError as err:
             _LOGGER.warning("Could not parse XML from %s: %s", discovery_info.ssdp_location, err)
             return self.async_abort(reason="cannot_parse_xml")
