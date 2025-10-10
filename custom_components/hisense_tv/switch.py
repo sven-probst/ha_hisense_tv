@@ -150,5 +150,9 @@ class HisenseTvSwitch(SwitchEntity):
         )
 
         # Update state on startup
-        self.async_on_remove(self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_START, self._async_update_state))
-        self._async_update_state()
+        # This listener cleans itself up, so we don't need to track it for removal
+        # in the same way as persistent listeners.
+        if self.hass.is_running:
+            self._async_update_state()
+        else:
+            self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_START, self._async_update_state)
