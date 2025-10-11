@@ -144,7 +144,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             uid=uid,
             ip_address=ip_address,
         )
-        self._attr_name = None  # The primary entity's name is the device name
+        # Append a suffix to differentiate from other integrations like DLNA
+        self._attr_name = f"{name} (Steuerung)"
         self._enable_polling = enable_polling
 
         self._muted = False
@@ -185,10 +186,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         """Set the device class to TV."""
         _LOGGER.debug("device_class")
         return MediaPlayerDeviceClass.TV
-
-    @property
-    def icon(self):
-        return self._icon
 
     @property
     def supported_features(self):
