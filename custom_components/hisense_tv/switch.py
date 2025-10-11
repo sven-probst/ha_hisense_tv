@@ -40,8 +40,9 @@ class HisenseTvSwitch(SwitchEntity):
         # It doesn't need its own MQTT subscriptions or a full HisenseTvBase initialization.
         self._hass = hass
         self._name = name
-        self._device_unique_id = uid # Store the device's unique_id for lookups
-        self._attr_name = f"{name} Power"
+        self._device_unique_id = uid  # Store the device's unique_id for lookups
+        self.has_entity_name = True
+        self._attr_name = "Power"
         self._attr_unique_id = f"{uid}_power"
         self._is_on = False
         self._attr_icon = "mdi:power"
