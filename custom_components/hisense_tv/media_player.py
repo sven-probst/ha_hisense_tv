@@ -145,7 +145,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             ip_address=ip_address,
         )
         self._enable_polling = enable_polling
-        self._attr_name = name  # Use modern naming attribute
 
         self._muted = False
         self._attr_unique_id = uid
