@@ -74,17 +74,17 @@ class HisenseTvBase(object):
 
     def _out_topic(self, topic=""):
         try:
-            return self._mqtt_out + topic % self._client
+            out_topic = self._mqtt_out + topic % self._client
         except TypeError:
             # This handles topics that don't have a format placeholder (e.g., broadcast topics)
-            return self._mqtt_out + topic
+            out_topic = self._mqtt_out + topic
         _LOGGER.debug("_out_topic: %s", out_topic)
         return out_topic
 
     def _in_topic(self, topic=""):
         try:
-            return self._mqtt_in + topic % self._client
+            in_topic = self._mqtt_in + topic % self._client
         except TypeError:
-            return self._mqtt_in + topic
+            in_topic = self._mqtt_in + topic
         _LOGGER.debug("_in_topic: %s", in_topic)
         return in_topic
