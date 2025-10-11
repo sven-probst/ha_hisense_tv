@@ -55,7 +55,6 @@ class HisenseTvBase(object):
     ):
         self._client = DEFAULT_CLIENT_ID
         self._hass = hass
-        self._name = name
         self._mqtt_in = mqtt_in or ""
         self._mqtt_out = mqtt_out or ""
         self._mac = mac
