@@ -9,8 +9,8 @@ from homeassistant.components import mqtt
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import CONF_IP_ADDRESS, CONF_MAC, CONF_NAME
 from homeassistant.util import dt as dt_util
-
-from .const import CONF_MQTT_IN, CONF_MQTT_OUT, DOMAIN
+from .const import CONF_MQTT_IN, CONF_MQTT_OUT, DEFAULT_NAME, DOMAIN
+from .helper import HisenseTvBase
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,8 +30,6 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
     entity = HisenseTvSensor(
         hass=hass,
-        # The name will be set by the entity itself.
-        # We pass the base name from the config.
         name=name,
         mqtt_in=mqtt_in,
         mqtt_out=mqtt_out,
@@ -44,47 +42,36 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     async_add_entities([entity])
 
 
-class HisenseTvSensor(SensorEntity):
+class HisenseTvSensor(SensorEntity, HisenseTvBase):
     """Representation of a sensor that can be updated using MQTT."""
 
     def __init__(self, hass, name, mqtt_in, mqtt_out, mac, uid, ip_address):
-        self._hass = hass
-        self._name = name
-        self._mqtt_in = mqtt_in
-        self._mqtt_out = mqtt_out
-        self._mac = mac
-        self._client = "mobile"  # Client ID for topic construction
-
         # This ensures the entity has a unique ID within the device.
         self._attr_unique_id = f"{uid}_picturesettings"
+
+        super().__init__(
+            hass=hass,
+            name=None,  # This is a child entity; its name is set via _attr_name below.
+            mqtt_in=mqtt_in,
+            mqtt_out=mqtt_out,
+            mac=mac,
+            uid=uid,
+            ip_address=ip_address,
+        )
         # This will be the name of the sensor entity.
         self._attr_name = "Picture Settings"
         # Store the device's unique_id for the device_info property.
         self._device_unique_id = uid
         self._is_available = False
         self._state = {}
-        self._device_info_attr = {}  # store "getdeviceinfo"
-        self._tv_info_attr = {}  # store "gettvinfo"
+        self._device_info = {}  # store "getdeviceinfo"
+        self._tv_info = {}  # store "gettvinfo"
         self._last_trigger = dt_util.utcnow()
         self._force_trigger = False
 
     async def async_will_remove_from_hass(self):
         for unsubscribe in list(self._subscriptions.values()):
             unsubscribe()
-
-    def _out_topic(self, topic=""):
-        """Construct the outgoing MQTT topic."""
-        try:
-            return self._mqtt_out + topic % self._client
-        except TypeError:
-            return self._mqtt_out + topic
-
-    def _in_topic(self, topic=""):
-        """Construct the incoming MQTT topic."""
-        try:
-            return self._mqtt_in + topic % self._client
-        except TypeError:
-            return self._mqtt_in + topic
 
     async def async_added_to_hass(self):
         self._subscriptions = {}
@@ -186,7 +173,7 @@ class HisenseTvSensor(SensorEntity):
             return
 
         _LOGGER.debug("Received deviceinfo: %s", payload)
-        self._device_info_attr = payload
+        self._device_info = payload
         self.async_write_ha_state()    
 
     async def _message_received_tvinfo(self, msg):
@@ -198,7 +185,7 @@ class HisenseTvSensor(SensorEntity):
             return
 
         _LOGGER.debug("Received tvinfo: %s", payload)
-        self._tv_info_attr = payload
+        self._tv_info = payload
         self.async_write_ha_state()   
 
 
@@ -247,8 +234,9 @@ class HisenseTvSensor(SensorEntity):
     def extra_state_attributes(self):
         """Return the state attributes of the sensor."""
         attributes = {v["name"]: v["value"] for v in self._state.values()}
-        attributes["device_info"] = self._device_info_attr
-        attributes["tv_info"] = self._tv_info_attr
+        attributes["device_info"] = self._device_info
+        attributes["ip_address"] = self._ip_address
+        attributes["tv_info"] = self._tv_info
         return attributes
 
     @property
