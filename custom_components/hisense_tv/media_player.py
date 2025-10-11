@@ -144,7 +144,6 @@ class HisenseTvEntity(MediaPlayerEntity):
         self._icon = "mdi:television-shimmer"
         self._subscriptions = {}
         self._attr_name = None  # The primary entity's name is the device name
-        self.entity_id = f"{DOMAIN}.{name.lower().replace('-', '_')}"
         self._enable_polling = enable_polling
 
         self._muted = False
