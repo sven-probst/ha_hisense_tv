@@ -507,7 +507,7 @@ class HisenseTvEntity(MediaPlayerEntity):
 
         self._subscriptions["sourcelist"] = await mqtt.async_subscribe(
             self._hass,
-            self._out_topic("/remoteapp/mobile/%s/ui_service/data/sourcelist"),
+            self._in_topic("/remoteapp/%s/ui_service/data/sourcelist"),
             self._message_received_sourcelist,
         )
 
@@ -696,7 +696,7 @@ class HisenseTvEntity(MediaPlayerEntity):
                 "/remoteapp/tv/platform_service/%s/actions/getchannellistinfo"
             ),
             sub=self._in_topic(
-                "/remoteapp/mobile/%s/platform_service/data/getchannellistinfo"
+                "/remoteapp/%s/platform_service/data/getchannellistinfo"
             ),
         )
 
@@ -777,7 +777,7 @@ class HisenseTvEntity(MediaPlayerEntity):
         stream_get, unsubscribe_applist = await mqtt_pub_sub(
             hass=self._hass,
             pub=self._out_topic(vidaaapplist_topic),
-            sub=self._in_topic("/remoteapp/mobile/%s/ui_service/data/applist"),
+            sub=self._in_topic("/remoteapp/%s/ui_service/data/applist"),
         )
 
         try:
@@ -865,13 +865,17 @@ class HisenseTvEntity(MediaPlayerEntity):
                 "/remoteapp/tv/platform_service/%s/actions/channellist"
             ),
             sub=self._in_topic(
-                "/remoteapp/mobile/%s/platform_service/data/channellist"
+                "/remoteapp/%s/platform_service/data/channellist"
             ),
             payload=channel_info,
         )
 
         try:
             async for msg in stream_get:
+                # If msg is None, it means the MQTT subscription timed out.
+                if msg is None:
+                    _LOGGER.warning("Timeout waiting for channellistinfo response from TV.")
+                    break
                 try:
                     payload_string = msg[0].payload
                     if not payload_string or not isinstance(payload_string, str):
