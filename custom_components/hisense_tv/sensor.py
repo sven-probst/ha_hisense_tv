@@ -49,19 +49,22 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
     """Representation of a sensor that can be updated using MQTT."""
 
     def __init__(self, hass, name, mqtt_in, mqtt_out, mac, uid, ip_address):
+        # This ensures the entity has a unique ID within the device.
+        self._attr_unique_id = f"{uid}_picturesettings"
+        # This will be the name of the sensor entity.
+        self._attr_name = "Picture Settings"
+        # Store the device's unique_id for the device_info property.
+        self._device_unique_id = uid
+
         super().__init__(
             hass=hass,
             name=name,
             mqtt_in=mqtt_in,
             mqtt_out=mqtt_out,
             mac=mac,
-            uid=self._attr_unique_id,
+            uid=uid,  # Pass the original device unique_id to the base class
             ip_address=ip_address,
         )
-        # This will be the name of the sensor entity.
-        self._attr_name = "Picture Settings"
-        # This ensures the entity has a unique ID within the device.
-        self._attr_unique_id = f"{uid}_picturesettings"
         self._is_available = False
         self._state = {}
         self._device_info = {}  # store "getdeviceinfo"
@@ -243,7 +246,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         """Return the device info for the sensor."""
         # This links the sensor to the main media_player device.
         return {
-            "identifiers": {(DOMAIN, self._unique_id)},
+            "identifiers": {(DOMAIN, self._device_unique_id)},
         }
 
     async def async_update(self):
