@@ -55,8 +55,7 @@ class HisenseTvBase(object):
     ):
         self._client = DEFAULT_CLIENT_ID
         self._hass = hass
-        # Only set _name if it's provided. Child entities like sensors will pass None.
-        self._name = name if name is not None else None
+        self._name = name
         self._mqtt_in = mqtt_in or ""
         self._mqtt_out = mqtt_out or ""
         self._mac = mac
