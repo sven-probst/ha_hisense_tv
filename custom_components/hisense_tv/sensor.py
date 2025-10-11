@@ -30,7 +30,6 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
     entity = HisenseTvSensor(
         hass=hass,
-        name=name,
         mqtt_in=mqtt_in,
         mqtt_out=mqtt_out,
         mac=mac,
@@ -45,7 +44,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 class HisenseTvSensor(SensorEntity, HisenseTvBase):
     """Representation of a sensor that can be updated using MQTT."""
 
-    def __init__(self, hass, name, mqtt_in, mqtt_out, mac, uid, ip_address):
+    def __init__(self, hass, mqtt_in, mqtt_out, mac, uid, ip_address):
         # This ensures the entity has a unique ID within the device.
         self._attr_unique_id = f"{uid}_picturesettings"
 
