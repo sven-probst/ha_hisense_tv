@@ -54,7 +54,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
 
         super().__init__(
             hass=hass,
-            name=name,
+            name=None,  # Pass None to prevent the base class from setting the name
             mqtt_in=mqtt_in,
             mqtt_out=mqtt_out,
             mac=mac,
