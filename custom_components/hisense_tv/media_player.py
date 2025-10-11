@@ -44,7 +44,7 @@ from .const import (
     DEFAULT_NAME,
     DOMAIN,
 )
-from .helper import HisenseTvBase
+from .helper import HisenseTvBase, mqtt_pub_sub
 
 REQUIREMENTS = []
 
@@ -121,7 +121,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     async_add_entities([entity])
 
 
-class HisenseTvEntity(MediaPlayerEntity):
+class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
     """HisenseTV Media Player entity."""
 
     def __init__(
@@ -135,14 +135,15 @@ class HisenseTvEntity(MediaPlayerEntity):
         ip_address: str,
         enable_polling: bool,
     ):
-        self._hass = hass
-        self._mqtt_in = mqtt_in
-        self._mqtt_out = mqtt_out
-        self._mac = mac
-        self._ip_address = ip_address
-        self._client = "mobile"
-        self._icon = "mdi:television-shimmer"
-        self._subscriptions = {}
+        super().__init__(
+            hass=hass,
+            name=name,
+            mqtt_in=mqtt_in,
+            mqtt_out=mqtt_out,
+            mac=mac,
+            uid=uid,
+            ip_address=ip_address,
+        )
         self._attr_name = None  # The primary entity's name is the device name
         self._enable_polling = enable_polling
 
@@ -167,20 +168,6 @@ class HisenseTvEntity(MediaPlayerEntity):
         self._media_position_updated_at = dt_util.utcnow()
 
         self._sourcelist_requested = False
-
-    def _out_topic(self, topic=""):
-        """Construct the outgoing MQTT topic."""
-        try:
-            return self._mqtt_out + topic % self._client
-        except TypeError:
-            return self._mqtt_out + topic
-
-    def _in_topic(self, topic=""):
-        """Construct the incoming MQTT topic."""
-        try:
-            return self._mqtt_in + topic % self._client
-        except TypeError:
-            return self._mqtt_in + topic
 
     @property
     def should_poll(self):
@@ -503,7 +490,7 @@ class HisenseTvEntity(MediaPlayerEntity):
 
         self._subscriptions["sourcelist"] = await mqtt.async_subscribe(
             self._hass,
-            self._out_topic("/remoteapp/mobile/%s/ui_service/data/sourcelist"),
+            self._in_topic("/remoteapp/%s/ui_service/data/sourcelist"),
             self._message_received_sourcelist,
         )
 
