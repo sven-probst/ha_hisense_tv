@@ -74,12 +74,12 @@ class HisenseTvBase(object):
 
     def _out_topic(self, topic=""):
         try:
-            return self._mqtt_out + topic.replace("%s", self._client)
+            return self._mqtt_out + topic % self._client
         except TypeError:
             return self._mqtt_out + topic
 
     def _in_topic(self, topic=""):
         try:
-            return self._mqtt_in + topic.replace("%s", self._client)
+            return self._mqtt_in + topic % self._client
         except TypeError:
             return self._mqtt_in + topic
