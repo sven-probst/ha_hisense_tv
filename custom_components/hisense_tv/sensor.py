@@ -51,10 +51,6 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
     def __init__(self, hass, name, mqtt_in, mqtt_out, mac, uid, ip_address):
         # This ensures the entity has a unique ID within the device.
         self._attr_unique_id = f"{uid}_picturesettings"
-        # This will be the name of the sensor entity.
-        self._attr_name = "Picture Settings"
-        # Store the device's unique_id for the device_info property.
-        self._device_unique_id = uid
 
         super().__init__(
             hass=hass,
@@ -62,9 +58,13 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             mqtt_in=mqtt_in,
             mqtt_out=mqtt_out,
             mac=mac,
-            uid=uid,  # Pass the original device unique_id to the base class
+            uid=uid,
             ip_address=ip_address,
         )
+        # This will be the name of the sensor entity.
+        self._attr_name = "Picture Settings"
+        # Store the device's unique_id for the device_info property.
+        self._device_unique_id = uid
         self._is_available = False
         self._state = {}
         self._device_info = {}  # store "getdeviceinfo"

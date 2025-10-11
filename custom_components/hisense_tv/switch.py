@@ -39,13 +39,13 @@ class HisenseTvSwitch(SwitchEntity):
         # The switch entity is simpler and primarily delegates to the media_player.
         # It doesn't need its own MQTT subscriptions or a full HisenseTvBase initialization.
         self._hass = hass
-        self._name = name
         self._device_unique_id = uid # Store the device's unique_id for lookups
-        self._attr_name = "Power"
         self._attr_unique_id = f"{uid}_power"
         self._is_on = False
         self._attr_icon = "mdi:power"
         self._media_player_entity_id = None
+        # Set the entity name, which will be prefixed by the device name.
+        self._attr_name = "Power"
 
     @property
     def is_on(self):
