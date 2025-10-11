@@ -550,6 +550,21 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         except JSONDecodeError:
             payload = {}
         statetype = payload.get("statetype")
+        
+        # Using a map to handle different states is cleaner than a long if/elif chain.
+        state_handlers = {
+            "sourceswitch": self._handle_state_sourceswitch,
+            "livetv": self._handle_state_livetv,
+            "remote_launcher": self._handle_state_app, # Treat launcher as a generic app state
+            "app": self._handle_state_app,
+            "remote_epg": lambda p: None, # Do nothing for epg
+            "fake_sleep_0": self._handle_state_standby,
+        }
+
+        handler = state_handlers.get(statetype)
+        if handler:
+            handler(payload)
+
         _LOGGER.debug("message_received_state %s", statetype)
 
         if self._state == STATE_OFF:
@@ -617,6 +632,41 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             self._state = STATE_STANDBY
 
         self.async_write_ha_state()
+
+    def _handle_state_sourceswitch(self, payload):
+        """Handle 'sourceswitch' state."""
+        self._source_name = payload.get("sourcename")
+        self._source_id = payload.get("sourceid")
+        self._title = payload.get("displayname")
+        self._channel_name = payload.get("sourcename")
+        self._channel_num = None
+        self._starttime = None
+        self._endtime = None
+        self._position = None
+
+    def _handle_state_livetv(self, payload):
+        """Handle 'livetv' state."""
+        self._source_name = "TV"
+        self._title = payload.get("progname")
+        self._channel_name = payload.get("channel_name")
+        self._channel_num = payload.get("channel_num")
+        self._starttime = payload.get("starttime")
+        self._endtime = payload.get("endtime")
+
+    def _handle_state_app(self, payload):
+        """Handle 'app' and 'remote_launcher' states."""
+        self._source_name = "App"
+        # Use 'name' from 'app' state, or default to 'Applications' for launcher
+        self._title = payload.get("name", "Applications")
+        self._channel_name = payload.get("url") # Will be None for launcher, which is fine
+        self._channel_num = None
+        self._starttime = None
+        self._endtime = None
+        self._position = None
+
+    def _handle_state_standby(self, payload):
+        """Handle 'fake_sleep_0' state."""
+        self._state = STATE_STANDBY
 
     async def _build_library_node(self):
         node = BrowseMedia(
@@ -812,6 +862,56 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         try:
             async for msg in stream_get:
                 try:
+                    payload_string = msg[0].payload
+                    if not payload_string or not isinstance(payload_string, str):
+                        _LOGGER.debug("Skipping empty or invalid payload for channellist")
+                        break
+                    payload = json.loads(payload_string)
+                    for item in payload.get("list"):
+                        node.children.append(
+                            BrowseMedia(
+                                title=item.get("channel_name"),
+                                media_class=MediaClass.CHANNEL,
+                                media_content_type=MediaType.CHANNEL,
+                                media_content_id=item.get("channel_param"),
+                                can_play=True,
+                                can_expand=False,
+                            )
+                        )
+                except JSONDecodeError as err:
+                    _LOGGER.warning(
+                        "Could not build channel list from '%s': %s", msg, err.msg
+                    )
+                break
+        except asyncio.TimeoutError:
+            _LOGGER.debug("timeout error - channellist")
+
+        unsubscribe_channellist()
+        return node
+
+    async def async_play_media(self, media_type, media_id, **kwargs):
+        """Send the play_media command to the media player."""
+        _LOGGER.debug("async_play_media %s\n%s", media_id, kwargs)
+
+        if media_type == MediaType.CHANNEL:
+            channel = json.dumps({"channel_param": media_id})
+            await mqtt.async_publish(
+                hass=self._hass,
+                topic=self._out_topic(
+                    "/remoteapp/tv/ui_service/%s/actions/changechannel"
+                ),
+                payload=channel,
+            )
+        elif media_type == MediaType.APP:
+            app = self._app_list.get(media_id)
+            payload = json.dumps(
+                {"appId": media_id, "name": app.get("name"), "url": app.get("url")}
+            )
+            await mqtt.async_publish(
+                hass=self._hass,
+                topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/launchapp"),
+                payload=payload,
+            )
                     payload_string = msg[0].payload
                     if not payload_string or not isinstance(payload_string, str):
                         _LOGGER.debug("Skipping empty or invalid payload for channellist")

@@ -59,7 +59,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             ip_address=ip_address,
         )
         # This will be the name of the sensor entity.
-        self._attr_name = f"{name} Picture Settings"
+        self._attr_name = "Picture Settings"
         # This ensures the entity has a unique ID within the device.
         self._attr_unique_id = f"{uid}_picturesettings"
         self._is_available = False
@@ -244,6 +244,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         # This links the sensor to the main media_player device.
         return {
             "identifiers": {(DOMAIN, self._unique_id)},
+            "name": self._name,
         }
 
     async def async_update(self):

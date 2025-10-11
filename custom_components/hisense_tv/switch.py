@@ -41,7 +41,7 @@ class HisenseTvSwitch(SwitchEntity):
         self._hass = hass
         self._name = name
         self._device_unique_id = uid # Store the device's unique_id for lookups
-        self._attr_name = f"{name} Power"
+        self._attr_name = "Power"
         self._attr_unique_id = f"{uid}_power"
         self._is_on = False
         self._attr_icon = "mdi:power"
@@ -78,11 +78,18 @@ class HisenseTvSwitch(SwitchEntity):
         """Turn the entity on."""
         media_player = self._get_media_player_entity()
         if not media_player:
+        if not self._media_player_entity_id:
+            _LOGGER.error("Media player entity ID not found for switch.")
             return
 
         _LOGGER.debug("Calling async_turn_on for media_player: %s", media_player.entity_id)
         await media_player.async_turn_on()
     
+        _LOGGER.debug("Calling turn_on service for media_player: %s", self._media_player_entity_id)
+        await self.hass.services.async_call(
+            MEDIA_PLAYER_DOMAIN, SERVICE_TURN_ON, {ATTR_ENTITY_ID: self._media_player_entity_id}, blocking=True
+        )
+
         # Optimistically set the state to on.
         self._is_on = True
         self.async_write_ha_state()
@@ -91,10 +98,16 @@ class HisenseTvSwitch(SwitchEntity):
         """Turn the entity off."""
         media_player = self._get_media_player_entity()
         if not media_player:
+        if not self._media_player_entity_id:
+            _LOGGER.error("Media player entity ID not found for switch.")
             return
 
         _LOGGER.debug("Calling async_turn_off for media_player: %s", media_player.entity_id)
         await media_player.async_turn_off()
+        _LOGGER.debug("Calling turn_off service for media_player: %s", self._media_player_entity_id)
+        await self.hass.services.async_call(
+            MEDIA_PLAYER_DOMAIN, SERVICE_TURN_OFF, {ATTR_ENTITY_ID: self._media_player_entity_id}, blocking=True
+        )
 
         # Optimistically set the state to off.
         self._is_on = False
@@ -105,6 +118,7 @@ class HisenseTvSwitch(SwitchEntity):
         # The switch entity shares device info with the media_player
         return {
             "identifiers": {(DOMAIN, self._device_unique_id)},
+            "name": self._name,
             # By linking to the domain and unique_id, this entity will be automatically
             # associated with the device created by the media_player entity.
         }
