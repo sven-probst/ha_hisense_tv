@@ -44,6 +44,7 @@ class HisenseTvSwitch(SwitchEntity):
         self._attr_unique_id = f"{uid}_power"
         self._is_on = False
         self._attr_icon = "mdi:power"
+        self.has_entity_name = True
         self._media_player_entity_id = None
         # Set the entity name, which will be prefixed by the device name.
         self._attr_name = "Power"

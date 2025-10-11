@@ -58,6 +58,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             uid=uid,
             ip_address=ip_address,
         )
+        self.has_entity_name = True
         # This will be the name of the sensor entity.
         self._attr_name = "Picture Settings"
         # Store the device's unique_id for the device_info property.

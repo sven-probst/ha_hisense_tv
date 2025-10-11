@@ -144,7 +144,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             uid=uid,
             ip_address=ip_address,
         )
-        self._attr_name = name
+        self._attr_name = None  # The primary entity's name is the device name
         self._enable_polling = enable_polling
 
         self._muted = False
