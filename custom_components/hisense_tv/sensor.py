@@ -90,7 +90,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
 
         self._subscriptions["picturesettings"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic("/remoteapp/%s/platform_service/data/picturesetting"),
+            self._in_topic("/remoteapp/{client}/platform_service/data/picturesetting"),
             self._message_received,
         )
 
@@ -105,14 +105,14 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         # subscribe topic for "gettvinfo"
         self._subscriptions["tvinfo"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic("/remoteapp/%s/platform_service/data/gettvinfo"),
+            self._in_topic("/remoteapp/{client}/platform_service/data/gettvinfo"),
             self._message_received_tvinfo,
         )
 
         # subscribe topic for "getdeviceinfo"
         self._subscriptions["deviceinfo"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic("/remoteapp/%s/platform_service/data/getdeviceinfo"),
+            self._in_topic("/remoteapp/{client}/platform_service/data/getdeviceinfo"),
             self._message_received_deviceinfo,
         )
 
@@ -122,7 +122,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         await mqtt.async_publish(
             hass=self._hass,
             topic=self._out_topic(
-                "/remoteapp/tv/platform_service/%s/actions/picturesetting"
+                "/remoteapp/tv/platform_service/{client}/actions/picturesetting"
             ),
             payload="",
             retain=False,
@@ -148,7 +148,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         await mqtt.async_publish(
             hass=self._hass,
             topic=self._out_topic(
-                "/remoteapp/tv/platform_service/%s/actions/getdeviceinfo"
+                "/remoteapp/tv/platform_service/{client}/actions/getdeviceinfo"
             ),
             payload="",
             retain=False,
@@ -157,7 +157,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         await mqtt.async_publish(
             hass=self._hass,
             topic=self._out_topic(
-                "/remoteapp/tv/platform_service/%s/actions/gettvinfo"
+                "/remoteapp/tv/platform_service/{client}/actions/gettvinfo"
             ),
             payload="",
             retain=False,
