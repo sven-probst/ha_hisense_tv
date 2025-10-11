@@ -78,13 +78,13 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         self._subscriptions = {}
         self._subscriptions["tvsleep"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic("/remoteapp/mobile/broadcast/platform_service/actions/tvsleep"),
+            self._in_topic("/remoteapp/broadcast/platform_service/actions/tvsleep"),
             self._message_received_turnoff,
         )
 
         self._subscriptions["state"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic("/remoteapp/mobile/broadcast/ui_service/state"),
+            self._in_topic("/remoteapp/broadcast/ui_service/state"),
             self._message_received_turnon,
         )
 
@@ -97,7 +97,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         self._subscriptions["picturesettings_value"] = await mqtt.async_subscribe(
             self._hass,
             self._in_topic(
-                "/remoteapp/mobile/broadcast/platform_service/data/picturesetting"
+                "/remoteapp/broadcast/platform_service/data/picturesetting"
             ),
             self._message_received_value,
         )

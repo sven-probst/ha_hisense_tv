@@ -171,16 +171,16 @@ class HisenseTvEntity(MediaPlayerEntity):
     def _out_topic(self, topic=""):
         """Construct the outgoing MQTT topic."""
         try:
-            return self._mqtt_out + topic % self._client
-        except TypeError:
             return self._mqtt_out + topic
+        except TypeError:
+            return self._mqtt_out + topic % self._client
 
     def _in_topic(self, topic=""):
         """Construct the incoming MQTT topic."""
         try:
-            return self._mqtt_in + topic % self._client
-        except TypeError:
             return self._mqtt_in + topic
+        except TypeError:
+            return self._mqtt_in + topic % self._client
 
     @property
     def should_poll(self):
@@ -485,19 +485,19 @@ class HisenseTvEntity(MediaPlayerEntity):
         """Subscribe to MQTT events."""
         self._subscriptions["tvsleep"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic("/remoteapp/mobile/broadcast/platform_service/actions/tvsleep"),
+            self._in_topic("/remoteapp/broadcast/platform_service/actions/tvsleep"),
             self._message_received_turnoff,
         )
 
         self._subscriptions["state"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic("/remoteapp/mobile/broadcast/ui_service/state"),
+            self._in_topic("/remoteapp/broadcast/ui_service/state"),
             self._message_received_state,
         )
 
         self._subscriptions["volume"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic("/remoteapp/mobile/broadcast/platform_service/actions/volumechange"),
+            self._in_topic("/remoteapp/broadcast/platform_service/actions/volumechange"),
             self._message_received_volume,
         )
 
