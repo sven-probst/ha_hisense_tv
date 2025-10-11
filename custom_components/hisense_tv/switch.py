@@ -78,17 +78,11 @@ class HisenseTvSwitch(SwitchEntity):
         """Turn the entity on."""
         media_player = self._get_media_player_entity()
         if not media_player:
-        if not self._media_player_entity_id:
-            _LOGGER.error("Media player entity ID not found for switch.")
+            _LOGGER.error("Could not find media_player entity to turn on.")
             return
 
         _LOGGER.debug("Calling async_turn_on for media_player: %s", media_player.entity_id)
         await media_player.async_turn_on()
-    
-        _LOGGER.debug("Calling turn_on service for media_player: %s", self._media_player_entity_id)
-        await self.hass.services.async_call(
-            MEDIA_PLAYER_DOMAIN, SERVICE_TURN_ON, {ATTR_ENTITY_ID: self._media_player_entity_id}, blocking=True
-        )
 
         # Optimistically set the state to on.
         self._is_on = True
@@ -98,16 +92,11 @@ class HisenseTvSwitch(SwitchEntity):
         """Turn the entity off."""
         media_player = self._get_media_player_entity()
         if not media_player:
-        if not self._media_player_entity_id:
-            _LOGGER.error("Media player entity ID not found for switch.")
+            _LOGGER.error("Could not find media_player entity to turn off.")
             return
 
         _LOGGER.debug("Calling async_turn_off for media_player: %s", media_player.entity_id)
         await media_player.async_turn_off()
-        _LOGGER.debug("Calling turn_off service for media_player: %s", self._media_player_entity_id)
-        await self.hass.services.async_call(
-            MEDIA_PLAYER_DOMAIN, SERVICE_TURN_OFF, {ATTR_ENTITY_ID: self._media_player_entity_id}, blocking=True
-        )
 
         # Optimistically set the state to off.
         self._is_on = False
