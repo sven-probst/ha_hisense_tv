@@ -78,28 +78,26 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         self._subscriptions = {}
         self._subscriptions["tvsleep"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic(
-                "/remoteapp/mobile/broadcast/platform_service/actions/tvsleep"
-            ),
+            self._in_topic("/remoteapp/broadcast/platform_service/actions/tvsleep"),
             self._message_received_turnoff,
         )
 
         self._subscriptions["state"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic("/remoteapp/mobile/broadcast/ui_service/state"),
+            self._in_topic("/remoteapp/broadcast/ui_service/state"),
             self._message_received_turnon,
         )
 
         self._subscriptions["picturesettings"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic("/remoteapp/mobile/%s/platform_service/data/picturesetting"),
+            self._in_topic("/remoteapp/%s/platform_service/data/picturesetting"),
             self._message_received,
         )
 
         self._subscriptions["picturesettings_value"] = await mqtt.async_subscribe(
             self._hass,
             self._in_topic(
-                "/remoteapp/mobile/broadcast/platform_service/data/picturesetting"
+                "/remoteapp/broadcast/platform_service/data/picturesetting"
             ),
             self._message_received_value,
         )
@@ -107,14 +105,14 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         # subscribe topic for "gettvinfo"
         self._subscriptions["tvinfo"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic("/remoteapp/mobile/%s/platform_service/data/gettvinfo"),
+            self._in_topic("/remoteapp/%s/platform_service/data/gettvinfo"),
             self._message_received_tvinfo,
         )
 
         # subscribe topic for "getdeviceinfo"
         self._subscriptions["deviceinfo"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic("/remoteapp/mobile/%s/platform_service/data/getdeviceinfo"),
+            self._in_topic("/remoteapp/%s/platform_service/data/getdeviceinfo"),
             self._message_received_deviceinfo,
         )
 

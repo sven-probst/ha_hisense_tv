@@ -485,23 +485,19 @@ class HisenseTvEntity(MediaPlayerEntity):
         """Subscribe to MQTT events."""
         self._subscriptions["tvsleep"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic(
-                "/remoteapp/mobile/broadcast/platform_service/actions/tvsleep"
-            ),
+            self._in_topic("/remoteapp/broadcast/platform_service/actions/tvsleep"),
             self._message_received_turnoff,
         )
 
         self._subscriptions["state"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic("/remoteapp/mobile/broadcast/ui_service/state"),
+            self._in_topic("/remoteapp/broadcast/ui_service/state"),
             self._message_received_state,
         )
 
         self._subscriptions["volume"] = await mqtt.async_subscribe(
             self._hass,
-            self._in_topic(
-                "/remoteapp/mobile/broadcast/platform_service/actions/volumechange"
-            ),
+            self._in_topic("/remoteapp/broadcast/platform_service/actions/volumechange"),
             self._message_received_volume,
         )
 

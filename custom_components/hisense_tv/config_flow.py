@@ -192,14 +192,14 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Subscribe to topics that indicate auth status
         unsub_needed = await mqtt.async_subscribe(
-            self.hass, f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/authentication", auth_needed_callback
+            self.hass, f"{mqtt_in}/remoteapp/{self._client_id}/ui_service/data/authentication", auth_needed_callback
         )
         unsub_ok = await mqtt.async_subscribe(
-            self.hass, f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/sourcelist", auth_ok_callback
+            self.hass, f"{mqtt_in}/remoteapp/{self._client_id}/ui_service/data/sourcelist", auth_ok_callback
         )
         # Also subscribe to the general state topic as a fallback for "auth_ok"
         unsub_state = await mqtt.async_subscribe(
-            self.hass, f"{mqtt_in}/remoteapp/mobile/broadcast/ui_service/state", auth_ok_callback
+            self.hass, f"{mqtt_in}/remoteapp/broadcast/ui_service/state", auth_ok_callback
         )
 
         try:
@@ -242,7 +242,7 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
             mqtt_out = self._data[CONF_MQTT_OUT]
 
             unsub = await mqtt.async_subscribe(
-                self.hass, f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/authenticationcode", auth_response_callback
+                self.hass, f"{mqtt_in}/remoteapp/{self._client_id}/ui_service/data/authenticationcode", auth_response_callback
             )
 
             try:
