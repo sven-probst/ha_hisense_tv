@@ -55,7 +55,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             mqtt_in=mqtt_in,
             mqtt_out=mqtt_out,
             mac=mac,
-            uid=uid,
+            uid=self._attr_unique_id,
             ip_address=ip_address,
         )
         # This will be the name of the sensor entity.

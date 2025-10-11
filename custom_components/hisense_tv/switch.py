@@ -107,9 +107,6 @@ class HisenseTvSwitch(SwitchEntity):
         # The switch entity shares device info with the media_player
         return {
             "identifiers": {(DOMAIN, self._device_unique_id)},
-            "name": self._name,
-            # By linking to the domain and unique_id, this entity will be automatically
-            # associated with the device created by the media_player entity.
         }
 
     @property
