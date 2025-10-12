@@ -146,7 +146,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         )
         # Set a specific name to avoid conflicts with other integrations like DLNA.
         # This results in a clean entity_id like 'media_player.living_room_tv_control'.
-        self._attr_name = f"{name} Steuerung"
+        self._attr_name = f"{name} Control"
         self._enable_polling = enable_polling
 
         self._muted = False
