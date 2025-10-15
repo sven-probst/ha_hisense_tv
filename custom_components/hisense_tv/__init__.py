@@ -13,9 +13,11 @@ from .const import (
     DOMAIN,
     SERVICE_SEND_KEY,
     SERVICE_SEND_CHANNEL,
+    SERVICE_LAUNCH_APP,
     ATTR_KEY,
     ATTR_ENTITY_ID,
     ATTR_CHANNEL,
+    ATTR_APP_NAME,
     SSDP_ST,
     CONF_MQTT_OUT,
     DEFAULT_CLIENT_ID,
@@ -38,6 +40,13 @@ SEND_CHANNEL_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_ENTITY_ID): cv.entity_id,
         vol.Required(ATTR_CHANNEL): vol.All(vol.Coerce(int), vol.Range(min=0)),
+    }
+)
+
+LAUNCH_APP_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_ENTITY_ID): cv.entity_id,
+        vol.Required(ATTR_APP_NAME): cv.string,
     }
 )
 
@@ -152,6 +161,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         DOMAIN, SERVICE_SEND_CHANNEL, async_send_channel_service, schema=SEND_CHANNEL_SCHEMA
     )
 
+    async def async_launch_app_service(call: ServiceCall):
+        """Handles the launch_app service call."""
+        _LOGGER.debug("Service hisense_tv.launch_app called with data: %s", call.data)
+
+        target_entity_id = call.data[ATTR_ENTITY_ID]
+        app_name = call.data[ATTR_APP_NAME]
+
+        # Get the media_player entity
+        media_player_entity = hass.data["media_player"].get_entity(target_entity_id)
+
+        if not media_player_entity:
+            _LOGGER.error("Entity %s not found.", target_entity_id)
+            return
+
+        await media_player_entity.async_launch_app(app_name)
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_LAUNCH_APP, async_launch_app_service, schema=LAUNCH_APP_SCHEMA
+    )
+
     return True
 
 
@@ -168,6 +197,7 @@ async def async_unload_entry(hass, entry):
     # Remove the custom services
     hass.services.async_remove(DOMAIN, SERVICE_SEND_KEY)
     hass.services.async_remove(DOMAIN, SERVICE_SEND_CHANNEL)
+    hass.services.async_remove(DOMAIN, SERVICE_LAUNCH_APP)
 
     unload_ok = all(
         await asyncio.gather(

@@ -117,3 +117,23 @@ send_channel:
         number:
           min: 0
           max: 9999 # Max. Kanalnummer nach Bedarf anpassen
+
+launch_app:
+  name: Launch Application
+  description: Launches an application on the Hisense TV.
+  fields:
+    entity_id:
+      name: Target TV
+      description: The entity ID of the Hisense TV to launch the app on.
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          integration: hisense_tv
+    app_name:
+      name: Application Name
+      description: The name of the application to launch (e.g., "youtube", "netflix").
+      required: true
+      example: "youtube"
+      selector:
+        text:

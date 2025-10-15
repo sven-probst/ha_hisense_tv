@@ -857,3 +857,39 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                 topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/launchapp"),
                 payload=payload,
             )
+
+    async def async_launch_app(self, app_name: str):
+        """Launch an application by name."""
+        _LOGGER.debug("Launching app: %s", app_name)
+
+        if not self._app_list:
+            _LOGGER.debug("App list is empty, fetching it now.")
+            await self._build_app_list_node()
+
+        app_id_to_launch = None
+        app_to_launch = None
+
+        # Search for the app in the app list
+        for app_id, app_info in self._app_list.items():
+            if app_info.get("name", "").lower() == app_name.lower():
+                app_id_to_launch = app_id
+                app_to_launch = app_info
+                break
+
+        if app_id_to_launch and app_to_launch:
+            await self.async_play_media(media_type=MediaType.APP, media_id=app_id_to_launch)
+        else:
+            # Fallback for apps that are not in the list from the TV, but can be started.
+            # e.g. "hbbtv"
+            _LOGGER.info(
+                "App '%s' not found in the cached app list. Trying to launch by name.",
+                app_name,
+            )
+            payload = json.dumps(
+                {"appId": app_name, "name": app_name, "url": app_name}
+            )
+            await mqtt.async_publish(
+                hass=self._hass,
+                topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/launchapp"),
+                payload=payload,
+            )
