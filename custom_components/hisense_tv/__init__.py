@@ -16,11 +16,14 @@ from .const import (
     SERVICE_SEND_CHANNEL,
     SERVICE_LAUNCH_APP,
     SERVICE_SEND_TEXT,
+    SERVICE_SEND_MOUSE_EVENT,
     ATTR_KEY,
     ATTR_ENTITY_ID,
     ATTR_CHANNEL,
     ATTR_APP_NAME,
     ATTR_TEXT,
+    ATTR_DX,
+    ATTR_DY,
     SSDP_ST,
     CONF_MQTT_OUT,
     DEFAULT_CLIENT_ID,
@@ -57,6 +60,14 @@ SEND_TEXT_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_ENTITY_ID): cv.entity_id,
         vol.Required(ATTR_TEXT): cv.string,
+    }
+)
+
+SEND_MOUSE_EVENT_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_ENTITY_ID): cv.entity_id,
+        vol.Required(ATTR_DX): vol.Coerce(int),
+        vol.Required(ATTR_DY): vol.Coerce(int),
     }
 )
 
@@ -220,6 +231,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         DOMAIN, SERVICE_SEND_TEXT, async_send_text_service, schema=SEND_TEXT_SCHEMA
     )
 
+    async def async_send_mouse_event_service(call: ServiceCall):
+        """Handles the send_mouse_event service call."""
+        _LOGGER.debug("Service hisense_tv.send_mouse_event called with data: %s", call.data)
+        
+        target_entity_id = call.data[ATTR_ENTITY_ID]
+        dx = call.data[ATTR_DX]
+        dy = call.data[ATTR_DY]
+
+        mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
+        if not mqtt_out_prefix:
+            return
+
+        client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
+        
+        # Convert to 16-bit signed hex
+        hex_dx = format(dx & 0xFFFF, '04x')
+        hex_dy = format(dy & 0xFFFF, '04x')
+
+        formatted_topic = f"{mqtt_out_prefix}remoteapp/tv/remote_service/{client_id_for_topic}$vidaa_common/actions/mouse"
+        payload = f"REL_{hex_dx}_{hex_dy}_0000"
+
+        _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
+        await mqtt.async_publish(
+            hass=hass,
+            topic=formatted_topic,
+            payload=payload,
+            retain=False,
+        )
+        # No sleep needed for mouse events as they are sent in quick succession
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_SEND_MOUSE_EVENT, async_send_mouse_event_service, schema=SEND_MOUSE_EVENT_SCHEMA
+    )
+
     return True
 
 
@@ -238,6 +283,7 @@ async def async_unload_entry(hass, entry):
     hass.services.async_remove(DOMAIN, SERVICE_SEND_CHANNEL)
     hass.services.async_remove(DOMAIN, SERVICE_LAUNCH_APP)
     hass.services.async_remove(DOMAIN, SERVICE_SEND_TEXT)
+    hass.services.async_remove(DOMAIN, SERVICE_SEND_MOUSE_EVENT)
 
     unload_ok = all(
         await asyncio.gather(

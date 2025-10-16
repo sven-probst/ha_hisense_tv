@@ -19,6 +19,7 @@ SERVICE_SEND_KEY = "send_key"
 SERVICE_SEND_CHANNEL = "send_channel"
 SERVICE_LAUNCH_APP = "launch_app"
 SERVICE_SEND_TEXT = "send_text"
+SERVICE_SEND_MOUSE_EVENT = "send_mouse_event"
 
 # Service attributes
 ATTR_KEY = "key"
@@ -26,3 +27,5 @@ ATTR_ENTITY_ID = "entity_id"
 ATTR_CHANNEL = "channel"
 ATTR_APP_NAME = "app_name"
 ATTR_TEXT = "text"
+ATTR_DX = "dx"
+ATTR_DY = "dy"

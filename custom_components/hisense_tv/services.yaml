@@ -157,3 +157,36 @@ send_text:
       example: "Hello World"
       selector:
         text:
+
+send_mouse_event:
+  name: Send Mouse Event
+  description: Sends a relative mouse movement event to the Hisense TV.
+  fields:
+    entity_id:
+      name: Target TV
+      description: The entity ID of the Hisense TV to send the event to.
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          integration: hisense_tv
+    dx:
+      name: Delta X
+      description: The relative horizontal movement.
+      required: true
+      example: 10
+      selector:
+        number:
+          min: -32768
+          max: 32767
+          step: 1
+    dy:
+      name: Delta Y
+      description: The relative vertical movement.
+      required: true
+      example: -10
+      selector:
+        number:
+          min: -32768
+          max: 32767
+          step: 1
