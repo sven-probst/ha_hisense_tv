@@ -5,6 +5,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.components import mqtt
+from homeassistant.const import CONF_MAC
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 import voluptuous as vol
@@ -14,10 +15,12 @@ from .const import (
     SERVICE_SEND_KEY,
     SERVICE_SEND_CHANNEL,
     SERVICE_LAUNCH_APP,
+    SERVICE_SEND_TEXT,
     ATTR_KEY,
     ATTR_ENTITY_ID,
     ATTR_CHANNEL,
     ATTR_APP_NAME,
+    ATTR_TEXT,
     SSDP_ST,
     CONF_MQTT_OUT,
     DEFAULT_CLIENT_ID,
@@ -47,6 +50,13 @@ LAUNCH_APP_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_ENTITY_ID): cv.entity_id,
         vol.Required(ATTR_APP_NAME): cv.string,
+    }
+)
+
+SEND_TEXT_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_ENTITY_ID): cv.entity_id,
+        vol.Required(ATTR_TEXT): cv.string,
     }
 )
 
@@ -181,6 +191,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         DOMAIN, SERVICE_LAUNCH_APP, async_launch_app_service, schema=LAUNCH_APP_SCHEMA
     )
 
+    async def async_send_text_service(call: ServiceCall):
+        """Handles the send_text service call."""
+        _LOGGER.debug("Service hisense_tv.send_text called with data: %s", call.data)
+        
+        target_entity_id = call.data[ATTR_ENTITY_ID]
+        text_to_send = call.data[ATTR_TEXT]
+
+        mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
+        if not mqtt_out_prefix:
+            return
+
+        client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
+        formatted_topic = f"{mqtt_out_prefix}remoteapp/tv/remote_service/{client_id_for_topic}$vidaa_common/actions/input"
+
+        for char in text_to_send:
+            payload = f"Lit_{char}"
+            _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
+            await mqtt.async_publish(
+                hass=hass,
+                topic=formatted_topic,
+                payload=payload,
+                retain=False,
+            )
+            await asyncio.sleep(0.1)
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_SEND_TEXT, async_send_text_service, schema=SEND_TEXT_SCHEMA
+    )
+
     return True
 
 
@@ -198,6 +237,7 @@ async def async_unload_entry(hass, entry):
     hass.services.async_remove(DOMAIN, SERVICE_SEND_KEY)
     hass.services.async_remove(DOMAIN, SERVICE_SEND_CHANNEL)
     hass.services.async_remove(DOMAIN, SERVICE_LAUNCH_APP)
+    hass.services.async_remove(DOMAIN, SERVICE_SEND_TEXT)
 
     unload_ok = all(
         await asyncio.gather(

@@ -137,3 +137,23 @@ launch_app:
       example: "youtube"
       selector:
         text:
+
+send_text:
+  name: Send Text
+  description: Sends a text string to the Hisense TV.
+  fields:
+    entity_id:
+      name: Target TV
+      description: The entity ID of the Hisense TV to send the text to.
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          integration: hisense_tv
+    text:
+      name: Text
+      description: The text string to send.
+      required: true
+      example: "Hello World"
+      selector:
+        text:
