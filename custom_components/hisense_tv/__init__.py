@@ -66,8 +66,8 @@ SEND_TEXT_SCHEMA = vol.Schema(
 SEND_MOUSE_EVENT_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_ENTITY_ID): cv.entity_id,
-        vol.Required(ATTR_DX): vol.Coerce(int),
-        vol.Required(ATTR_DY): vol.Coerce(int),
+        vol.Required(ATTR_DX): cv.string,
+        vol.Required(ATTR_DY): cv.string,
     }
 )
 
@@ -236,8 +236,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.debug("Service hisense_tv.send_mouse_event called with data: %s", call.data)
         
         target_entity_id = call.data[ATTR_ENTITY_ID]
-        dx = call.data[ATTR_DX]
-        dy = call.data[ATTR_DY]
+        dx_str = call.data[ATTR_DX]
+        dy_str = call.data[ATTR_DY]
+
+        try:
+            dx = int(dx_str)
+        except (ValueError, TypeError):
+            dx = 0
+
+        try:
+            dy = int(dy_str)
+        except (ValueError, TypeError):
+            dy = 0
 
         mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
         if not mqtt_out_prefix:
