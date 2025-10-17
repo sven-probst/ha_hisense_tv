@@ -8,6 +8,7 @@ from homeassistant.components import mqtt
 from homeassistant.const import CONF_MAC
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.service import async_extract_referenced_entity_ids
 import voluptuous as vol
 
 from .const import ( 
@@ -18,7 +19,6 @@ from .const import (
     SERVICE_SEND_TEXT,
     SERVICE_SEND_MOUSE_EVENT,
     ATTR_KEY,
-    ATTR_ENTITY_ID,
     ATTR_CHANNEL,
     ATTR_APP_NAME,
     ATTR_TEXT,
@@ -37,37 +37,32 @@ PLATFORMS = ["media_player", "switch", "sensor"]
 # Define the schema for the send_key service
 SEND_KEY_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_ENTITY_ID): cv.entity_id,
         vol.Required(ATTR_KEY): vol.Any(cv.string, vol.All(cv.ensure_list, [cv.string])),
     }
 )
 
 SEND_CHANNEL_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_ENTITY_ID): cv.entity_id,
         vol.Required(ATTR_CHANNEL): vol.All(vol.Coerce(int), vol.Range(min=0)),
     }
 )
 
 LAUNCH_APP_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_ENTITY_ID): cv.entity_id,
         vol.Required(ATTR_APP_NAME): cv.string,
     }
 )
 
 SEND_TEXT_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_ENTITY_ID): cv.entity_id,
         vol.Required(ATTR_TEXT): cv.string,
     }
 )
 
 SEND_MOUSE_EVENT_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_ENTITY_ID): cv.entity_id,
-        vol.Required(ATTR_DX): cv.string,
-        vol.Required(ATTR_DY): cv.string,
+        vol.Required(ATTR_DX): vol.Coerce(int),
+        vol.Required(ATTR_DY): vol.Coerce(int),
     }
 )
 
@@ -115,29 +110,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         """Handles the send_key service call."""
         _LOGGER.debug("Service hisense_tv.send_key called with data: %s", call.data)
         
-        target_entity_id = call.data[ATTR_ENTITY_ID]
         keys_to_send = call.data[ATTR_KEY]
+        entity_ids = await async_extract_referenced_entity_ids(hass, call)
 
-        mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
-        if not mqtt_out_prefix:
-            return
+        for target_entity_id in entity_ids:
+            mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
+            if not mqtt_out_prefix:
+                continue
 
-        client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
-        formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
+            client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
+            formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
 
-        if isinstance(keys_to_send, str):
-            keys_to_send = [keys_to_send]
+            keys = keys_to_send
+            if isinstance(keys, str):
+                keys = [keys]
 
-        for key in keys_to_send:
-            payload = f"KEY_{key}"
-            _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
-            await mqtt.async_publish(
-                hass=hass,
-                topic=formatted_topic,
-                payload=payload,
-                retain=False,
-            )
-            await asyncio.sleep(0.5) # A small delay between keys can improve reliability
+            for key in keys:
+                payload = f"KEY_{key}"
+                _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
+                await mqtt.async_publish(
+                    hass=hass,
+                    topic=formatted_topic,
+                    payload=payload,
+                    retain=False,
+                )
+                await asyncio.sleep(0.5) # A small delay between keys can improve reliability
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_KEY, async_send_key_service, schema=SEND_KEY_SCHEMA
@@ -147,36 +144,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         """Handles the send_channel service call."""
         _LOGGER.debug("Service hisense_tv.send_channel called with data: %s", call.data)
         
-        target_entity_id = call.data[ATTR_ENTITY_ID]
         channel_number = str(call.data[ATTR_CHANNEL])
+        entity_ids = await async_extract_referenced_entity_ids(hass, call)
 
-        mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
-        if not mqtt_out_prefix:
-            return
+        for target_entity_id in entity_ids:
+            mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
+            if not mqtt_out_prefix:
+                continue
 
-        client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
-        # Use the same sendkey topic, as each digit is a key
-        formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
+            client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
+            # Use the same sendkey topic, as each digit is a key
+            formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
 
-        _LOGGER.debug("Sending KEY_EXIT before channel digits for entity: %s", target_entity_id)
-        await mqtt.async_publish(
-            hass=hass,
-            topic=formatted_topic,
-            payload="KEY_EXIT",
-            retain=False,
-        )
-        await asyncio.sleep(0.5)
-
-        for digit in channel_number:
-            key_payload = f"KEY_{digit}"
-            _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, key_payload, target_entity_id)
+            _LOGGER.debug("Sending KEY_EXIT before channel digits for entity: %s", target_entity_id)
             await mqtt.async_publish(
                 hass=hass,
                 topic=formatted_topic,
-                payload=key_payload,
+                payload="KEY_EXIT",
                 retain=False,
             )
             await asyncio.sleep(0.5)
+
+            for digit in channel_number:
+                key_payload = f"KEY_{digit}"
+                _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, key_payload, target_entity_id)
+                await mqtt.async_publish(
+                    hass=hass,
+                    topic=formatted_topic,
+                    payload=key_payload,
+                    retain=False,
+                )
+                await asyncio.sleep(0.5)
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_CHANNEL, async_send_channel_service, schema=SEND_CHANNEL_SCHEMA
@@ -186,17 +184,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         """Handles the launch_app service call."""
         _LOGGER.debug("Service hisense_tv.launch_app called with data: %s", call.data)
 
-        target_entity_id = call.data[ATTR_ENTITY_ID]
         app_name = call.data[ATTR_APP_NAME]
+        entity_ids = await async_extract_referenced_entity_ids(hass, call)
 
-        # Get the media_player entity
-        media_player_entity = hass.data["media_player"].get_entity(target_entity_id)
+        for target_entity_id in entity_ids:
+            # Get the media_player entity
+            media_player_entity = hass.data["media_player"].get_entity(target_entity_id)
 
-        if not media_player_entity:
-            _LOGGER.error("Entity %s not found.", target_entity_id)
-            return
+            if not media_player_entity:
+                _LOGGER.error("Entity %s not found.", target_entity_id)
+                continue
 
-        await media_player_entity.async_launch_app(app_name)
+            await media_player_entity.async_launch_app(app_name)
 
     hass.services.async_register(
         DOMAIN, SERVICE_LAUNCH_APP, async_launch_app_service, schema=LAUNCH_APP_SCHEMA
@@ -206,26 +205,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         """Handles the send_text service call."""
         _LOGGER.debug("Service hisense_tv.send_text called with data: %s", call.data)
         
-        target_entity_id = call.data[ATTR_ENTITY_ID]
         text_to_send = call.data[ATTR_TEXT]
+        entity_ids = await async_extract_referenced_entity_ids(hass, call)
 
-        mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
-        if not mqtt_out_prefix:
-            return
+        for target_entity_id in entity_ids:
+            mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
+            if not mqtt_out_prefix:
+                continue
 
-        client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
-        formatted_topic = f"{mqtt_out_prefix}remoteapp/tv/remote_service/{client_id_for_topic}$vidaa_common/actions/input"
+            client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
+            formatted_topic = f"{mqtt_out_prefix}remoteapp/tv/remote_service/{client_id_for_topic}$vidaa_common/actions/input"
 
-        for char in text_to_send:
-            payload = f"Lit_{char}"
-            _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
-            await mqtt.async_publish(
-                hass=hass,
-                topic=formatted_topic,
-                payload=payload,
-                retain=False,
-            )
-            await asyncio.sleep(0.1)
+            for char in text_to_send:
+                payload = f"Lit_{char}"
+                _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
+                await mqtt.async_publish(
+                    hass=hass,
+                    topic=formatted_topic,
+                    payload=payload,
+                    retain=False,
+                )
+                await asyncio.sleep(0.1)
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_TEXT, async_send_text_service, schema=SEND_TEXT_SCHEMA
@@ -235,41 +235,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         """Handles the send_mouse_event service call."""
         _LOGGER.debug("Service hisense_tv.send_mouse_event called with data: %s", call.data)
         
-        target_entity_id = call.data[ATTR_ENTITY_ID]
-        dx_str = call.data[ATTR_DX]
-        dy_str = call.data[ATTR_DY]
+        dx = call.data[ATTR_DX]
+        dy = call.data[ATTR_DY]
+        entity_ids = await async_extract_referenced_entity_ids(hass, call)
 
-        try:
-            dx = int(dx_str)
-        except (ValueError, TypeError):
-            dx = 0
+        for target_entity_id in entity_ids:
+            mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
+            if not mqtt_out_prefix:
+                continue
 
-        try:
-            dy = int(dy_str)
-        except (ValueError, TypeError):
-            dy = 0
+            client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
+            
+            # Convert to 16-bit signed hex
+            hex_dx = format(dx & 0xFFFF, '04x')
+            hex_dy = format(dy & 0xFFFF, '04x')
 
-        mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
-        if not mqtt_out_prefix:
-            return
+            formatted_topic = f"{mqtt_out_prefix}remoteapp/tv/remote_service/{client_id_for_topic}$vidaa_common/actions/mouse"
+            payload = f"REL_{hex_dx}_{hex_dy}_0000"
 
-        client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
-        
-        # Convert to 16-bit signed hex
-        hex_dx = format(dx & 0xFFFF, '04x')
-        hex_dy = format(dy & 0xFFFF, '04x')
-
-        formatted_topic = f"{mqtt_out_prefix}remoteapp/tv/remote_service/{client_id_for_topic}$vidaa_common/actions/mouse"
-        payload = f"REL_{hex_dx}_{hex_dy}_0000"
-
-        _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
-        await mqtt.async_publish(
-            hass=hass,
-            topic=formatted_topic,
-            payload=payload,
-            retain=False,
-        )
-        # No sleep needed for mouse events as they are sent in quick succession
+            _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
+            await mqtt.async_publish(
+                hass=hass,
+                topic=formatted_topic,
+                payload=payload,
+                retain=False,
+            )
+            # No sleep needed for mouse events as they are sent in quick succession
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_MOUSE_EVENT, async_send_mouse_event_service, schema=SEND_MOUSE_EVENT_SCHEMA
