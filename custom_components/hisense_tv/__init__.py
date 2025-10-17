@@ -5,7 +5,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.components import mqtt
-from homeassistant.const import CONF_MAC
+from homeassistant.const import CONF_MAC, ATTR_ENTITY_ID
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.service import async_extract_referenced_entity_ids
@@ -38,32 +38,37 @@ PLATFORMS = ["media_player", "switch", "sensor"]
 SEND_KEY_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_KEY): vol.Any(cv.string, vol.All(cv.ensure_list, [cv.string])),
-    }
+    },
+    extra=vol.ALLOW_EXTRA,
 )
 
 SEND_CHANNEL_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_CHANNEL): vol.All(vol.Coerce(int), vol.Range(min=0)),
-    }
+    },
+    extra=vol.ALLOW_EXTRA,
 )
 
 LAUNCH_APP_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_APP_NAME): cv.string,
-    }
+    },
+    extra=vol.ALLOW_EXTRA,
 )
 
 SEND_TEXT_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_TEXT): cv.string,
-    }
+    },
+    extra=vol.ALLOW_EXTRA,
 )
 
 SEND_MOUSE_EVENT_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_DX): vol.Coerce(int),
         vol.Required(ATTR_DY): vol.Coerce(int),
-    }
+    },
+    extra=vol.ALLOW_EXTRA,
 )
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
