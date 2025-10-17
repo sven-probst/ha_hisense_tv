@@ -8,7 +8,7 @@ from homeassistant.components import mqtt
 from homeassistant.const import CONF_MAC, ATTR_ENTITY_ID
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.service import async_extract_referenced_entity_ids
+from homeassistant.helpers.service import async_extract_entity_ids
 import voluptuous as vol
 
 from .const import ( 
@@ -116,7 +116,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.debug("Service hisense_tv.send_key called with data: %s", call.data)
         
         keys_to_send = call.data[ATTR_KEY]
-        entity_ids = await async_extract_referenced_entity_ids(hass, call)
+        entity_ids = await async_extract_entity_ids(hass, call)
 
         for target_entity_id in entity_ids:
             mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
@@ -150,7 +150,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.debug("Service hisense_tv.send_channel called with data: %s", call.data)
         
         channel_number = str(call.data[ATTR_CHANNEL])
-        entity_ids = await async_extract_referenced_entity_ids(hass, call)
+        entity_ids = await async_extract_entity_ids(hass, call)
 
         for target_entity_id in entity_ids:
             mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
@@ -190,7 +190,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.debug("Service hisense_tv.launch_app called with data: %s", call.data)
 
         app_name = call.data[ATTR_APP_NAME]
-        entity_ids = await async_extract_referenced_entity_ids(hass, call)
+        entity_ids = await async_extract_entity_ids(hass, call)
 
         for target_entity_id in entity_ids:
             # Get the media_player entity
@@ -211,7 +211,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.debug("Service hisense_tv.send_text called with data: %s", call.data)
         
         text_to_send = call.data[ATTR_TEXT]
-        entity_ids = await async_extract_referenced_entity_ids(hass, call)
+        entity_ids = await async_extract_entity_ids(hass, call)
 
         for target_entity_id in entity_ids:
             mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
@@ -242,7 +242,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         
         dx = call.data[ATTR_DX]
         dy = call.data[ATTR_DY]
-        entity_ids = await async_extract_referenced_entity_ids(hass, call)
+        entity_ids = await async_extract_entity_ids(hass, call)
 
         for target_entity_id in entity_ids:
             mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
