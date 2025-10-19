@@ -65,8 +65,8 @@ SEND_TEXT_SCHEMA = vol.Schema(
 
 SEND_MOUSE_EVENT_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_DX): vol.Any(str, int),
-        vol.Required(ATTR_DY): vol.Any(str, int),
+        vol.Required(ATTR_DX): vol.Any(str, int, float),
+        vol.Required(ATTR_DY): vol.Any(str, int, float),
     },
     extra=vol.ALLOW_EXTRA,
 )
@@ -240,10 +240,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         """Handles the send_mouse_event service call."""
         _LOGGER.debug("Service hisense_tv.send_mouse_event called with data: %s", call.data)
         
-        # Convert dx and dy to integers, allowing for string inputs
+        # Convert dx and dy to integers, allowing for string and float inputs
         try:
-            dx = int(call.data[ATTR_DX])
-            dy = int(call.data[ATTR_DY])
+            dx = int(float(call.data[ATTR_DX]))
+            dy = int(float(call.data[ATTR_DY]))
         except (ValueError, TypeError):
             _LOGGER.error("Invalid value for dx or dy: %s", call.data)
             return
