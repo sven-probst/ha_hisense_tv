@@ -116,7 +116,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.debug("Service hisense_tv.send_key called with data: %s", call.data)
         
         keys_to_send = call.data[ATTR_KEY]
-        entity_ids = await async_extract_entity_ids(hass, call)
+        entity_ids = await async_extract_entity_ids(call)
 
         for target_entity_id in entity_ids:
             mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
@@ -150,7 +150,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.debug("Service hisense_tv.send_channel called with data: %s", call.data)
         
         channel_number = str(call.data[ATTR_CHANNEL])
-        entity_ids = await async_extract_entity_ids(hass, call)
+        entity_ids = await async_extract_entity_ids(call)
 
         for target_entity_id in entity_ids:
             mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
@@ -190,7 +190,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.debug("Service hisense_tv.launch_app called with data: %s", call.data)
 
         app_name = call.data[ATTR_APP_NAME]
-        entity_ids = await async_extract_entity_ids(hass, call)
+        entity_ids = await async_extract_entity_ids(call)
 
         for target_entity_id in entity_ids:
             # Get the media_player entity
@@ -211,7 +211,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.debug("Service hisense_tv.send_text called with data: %s", call.data)
         
         text_to_send = call.data[ATTR_TEXT]
-        entity_ids = await async_extract_entity_ids(hass, call)
+        entity_ids = await async_extract_entity_ids(call)
 
         for target_entity_id in entity_ids:
             mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
@@ -240,15 +240,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         """Handles the send_mouse_event service call."""
         _LOGGER.debug("Service hisense_tv.send_mouse_event called with data: %s", call.data)
         
-        # Convert dx and dy to integers, allowing for string and float inputs
+        # Scale and convert dx and dy to integers, rounding from float inputs
         try:
-            dx = int(float(call.data[ATTR_DX]))
-            dy = int(float(call.data[ATTR_DY]))
+            dx = int(round(float(call.data[ATTR_DX]) * 100))
+            dy = int(round(float(call.data[ATTR_DY]) * 100))
         except (ValueError, TypeError):
             _LOGGER.error("Invalid value for dx or dy: %s", call.data)
             return
         
-        entity_ids = await async_extract_entity_ids(hass, call)
+        entity_ids = await async_extract_entity_ids(call)
 
         for target_entity_id in entity_ids:
             mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
