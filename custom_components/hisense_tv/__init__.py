@@ -242,8 +242,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         
         # Scale and convert dx and dy to integers, rounding from float inputs
         try:
-            dx = int(round(float(call.data[ATTR_DX]) * 100))
-            dy = int(round(float(call.data[ATTR_DY]) * 100))
+            dx = int(round(float(call.data[ATTR_DX]) * 10))
+            dy = int(round(float(call.data[ATTR_DY]) * 10))
         except (ValueError, TypeError):
             _LOGGER.error("Invalid value for dx or dy: %s", call.data)
             return
