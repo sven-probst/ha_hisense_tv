@@ -240,8 +240,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         """Handles the send_mouse_event service call."""
         _LOGGER.debug("Service hisense_tv.send_mouse_event called with data: %s", call.data)
         
-        dx = call.data[ATTR_DX]
-        dy = call.data[ATTR_DY]
+        # Convert dx and dy to integers, allowing for string inputs
+        try:
+            dx = int(call.data[ATTR_DX])
+            dy = int(call.data[ATTR_DY])
+        except (ValueError, TypeError):
+            _LOGGER.error("Invalid value for dx or dy: %s", call.data)
+            return
+        
         entity_ids = await async_extract_entity_ids(hass, call)
 
         for target_entity_id in entity_ids:
