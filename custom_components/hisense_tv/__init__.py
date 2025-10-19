@@ -65,8 +65,8 @@ SEND_TEXT_SCHEMA = vol.Schema(
 
 SEND_MOUSE_EVENT_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_DX): vol.Coerce(int),
-        vol.Required(ATTR_DY): vol.Coerce(int),
+        vol.Required(ATTR_DX): vol.Any(str, int),
+        vol.Required(ATTR_DY): vol.Any(str, int),
     },
     extra=vol.ALLOW_EXTRA,
 )
