@@ -240,10 +240,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         """Handles the send_mouse_event service call."""
         _LOGGER.debug("Service hisense_tv.send_mouse_event called with data: %s", call.data)
         
-        # Scale and convert dx and dy to integers, rounding from float inputs
+        # Convert dx and dy to integers, rounding from float inputs
         try:
-            dx = int(round(float(call.data[ATTR_DX]) * 10))
-            dy = int(round(float(call.data[ATTR_DY]) * 10))
+            dx = int(round(float(call.data[ATTR_DX])))
+            dy = int(round(float(call.data[ATTR_DY])))
         except (ValueError, TypeError):
             _LOGGER.error("Invalid value for dx or dy: %s", call.data)
             return
