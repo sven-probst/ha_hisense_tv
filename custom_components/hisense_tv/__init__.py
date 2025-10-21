@@ -219,21 +219,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 continue
 
             client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
-            input_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/input"
-            sendkey_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
+            formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/input"
 
             for char in text_to_send:
-                if char == ' ':
-                    topic = sendkey_topic
-                    payload = "KEY_SPACE"
-                else:
-                    topic = input_topic
-                    payload = f"Lit_{char}"
-                
-                _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", topic, payload, target_entity_id)
+                payload = f"Lit_{char}"
+                _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
                 await mqtt.async_publish(
                     hass=hass,
-                    topic=topic,
+                    topic=formatted_topic,
                     payload=payload,
                     retain=False,
                 )
