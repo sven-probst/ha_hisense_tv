@@ -1,0 +1,43 @@
+# screencapture
+
+hisense/remoteapp/tv/platform_service/HomeAssistant/actions/screencapture (null)
+hisense/remoteapp/mobile/HomeAssistant/platform_service/data/screencaptureinfo {
+        "size": 0,
+        "width":        0,
+        "height":       0,
+        "format":       "png"
+
+----------------
+
+hisense/remoteapp/mobile/HomeAssistant/platform_service/data/getplatformcapbility [{
+                "name": "picture_setting",
+                "version":      "U4"
+        }, {
+                "name": "volume",
+                "version":      "00.00.01"
+        }, {
+                "name": "tv_name",
+                "version":      "00.00.01"
+        }, {
+                "name": "booking_list",
+                "version":      "00.00.01"
+        }, {
+                "name": "pvr",
+                "version":      "00.00.01"
+        }, {
+                "name": "reminder",
+                "version":      "00.00.01"
+        }, {
+                "name": "screen_capture",
+                "version":      "00.00.01"
+        }, {
+                "name": "channel",
+                "version":      "00.00.01"
+        }, {
+                "name": "fake_standby",
+                "version":      "00.00.01"
+        }]
+
+
+----------------
+

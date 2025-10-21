@@ -219,7 +219,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 continue
 
             client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
-            formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}$vidaa_common/actions/input"
+            formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/input"
 
             for char in text_to_send:
                 payload = f"Lit_{char}"
@@ -261,7 +261,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             hex_dx = format(dx & 0xFFFF, '04x')
             hex_dy = format(dy & 0xFFFF, '04x')
 
-            formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}$vidaa_common/actions/mouse"
+            formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/mouse"
             payload = f"REL_{hex_dx}_{hex_dy}_0000"
 
             _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
