@@ -547,7 +547,21 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         statetype = payload.get("statetype")
         _LOGGER.debug("message_received_state %s", statetype)
 
-        if self._state == STATE_OFF:
+        if not statetype:
+            _LOGGER.debug("no statetype found in payload, ignoring state message")
+            return
+
+        # Determine the new state based on statetype
+        if statetype in ("sourceswitch", "livetv", "remote_launcher", "app"):
+            new_state = STATE_PLAYING
+        elif statetype == "fake_sleep_0":
+            new_state = STATE_STANDBY
+        else:
+            # If statetype is unknown, don't change the state
+            new_state = self._state
+
+        # If TV is turning on, do some initial publishes
+        if self._state in (STATE_OFF, STATE_STANDBY) and new_state == STATE_PLAYING:
             await mqtt.async_publish(
                 hass=self._hass,
                 topic=self._out_topic("/remoteapp/tv/platform_service/%s/actions/getvolume"),
@@ -559,8 +573,10 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             await mqtt.async_publish(
                 hass=self._hass, topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/sourcelist"), payload=""
             )
+        
+        self._state = new_state
 
-        self._state = STATE_PLAYING
+        # Update attributes based on statetype
         if statetype == "sourceswitch":
             # sourceid:
             # sourcename:
@@ -608,8 +624,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             self._position = None
         elif statetype == "remote_epg":
             pass
-        elif statetype == "fake_sleep_0":
-            self._state = STATE_STANDBY
+        # No need for fake_sleep_0 here as state is already set
 
         self.async_write_ha_state()
 

@@ -40,4 +40,5 @@ hisense/remoteapp/mobile/HomeAssistant/platform_service/data/getplatformcapbilit
 
 
 ----------------
+String[] strArr = {x4.a.j("sourcechange"), x4.a.j("initsuccess"), x4.a.j("applistverchange"), x4.a.l(), x4.a.k("hotelmodechange"), x4.a.k("txtinputdata"), x4.a.h("volumechange"), x4.a.h("bwsinputdata"), x4.a.h("sourceinsert"), x4.a.h("vkbinvoke"), x4.a.h("tvsleep"), x4.a.i("voicetype"), x4.a.o("vidaa_app_connect"), x4.a.o("capability"), x4.a.o("sourcelist"), x4.a.o("appversion"), x4.a.o("applist"), x4.a.o("applisticon"), x4.a.o("authentication"), x4.a.o("authenticationcode"), x4.a.o("authenticationcodeclose"), x4.a.o("authenticationcodetoast"), x4.a.o("closeinput"), x4.a.o("vidaa_app_ble_connect"), x4.a.o("vidaa_app_fte_status"), x4.a.o("vidaa_app_fte_config_data"), x4.a.o("vidaa_app_fte_close"), x4.a.o("vidaa_app_fte_finish"), x4.a.n("gettvinfo"), x4.a.n("getplatformcapbility"), x4.a.n("getdeviceinfo"), x4.a.n("tokenissuance"), x4.a.o("login_each_other_info")};
 
