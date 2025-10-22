@@ -217,14 +217,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             _LOGGER.debug("async_update called, but polling is disabled for this entity.")
             return
 
-        # If the TV was considered ON and the last poll timed out, mark it as OFF.
-        if self._state != STATE_OFF and self._pending_poll_response:
-            _LOGGER.warning("Hisense TV did not respond to the last poll, marking as off.")
-            self._pending_poll_response = False  # Reset for the next cycle
-            self._state = STATE_OFF
-            self.async_write_ha_state()
-            return  # Exit to reflect the new OFF state immediately
-
         # Standard polling interval check
         if (
             not self._force_trigger
@@ -233,12 +225,12 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             _LOGGER.debug("Skip update")
             return
 
-        _LOGGER.debug("Update. force=%s", self._force_trigger)
+        _LOGGER.warning("===> Running update. Current state: %s, Pending response: %s", 
+                     self._state, self._pending_poll_response)
         self._force_trigger = False
         self._last_trigger = dt_util.utcnow()
 
-        # Set the pending flag before polling. If the TV is already on,
-        # this allows us to detect a timeout on the next cycle.
+        # Set the pending flag before polling.
         self._pending_poll_response = True
         
         # Always poll for the state, regardless of the current state in HA.
@@ -553,32 +545,41 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def _message_received_state(self, msg):
         """Run when new MQTT message has been received."""
+        _LOGGER.warning("===> _message_received_state called with payload: %s", msg.payload)
+        
         if msg.retain:
             _LOGGER.debug("message_received_state - skip retained message")
             return
 
         # TV hat geantwortet, also Poll-Response zurücksetzen
         self._pending_poll_response = False
+        _LOGGER.warning("===> Setting pending_poll_response to False")
         
         # Wenn der TV antwortet, behandeln wir ihn als eingeschaltet,
         # es sei denn er meldet explizit dass er aus ist
         try:
-            payload = json.loads(msg.payload)
-            statetype = payload.get("statetype")
-            if statetype == "fake_sleep_0":
-                new_state = STATE_STANDBY
-            else:
+            if msg.payload == "(null)":
+                _LOGGER.warning("===> Got (null) response - TV is responding")
                 new_state = STATE_PLAYING
+            else:
+                payload = json.loads(msg.payload)
+                statetype = payload.get("statetype")
+                if statetype == "fake_sleep_0":
+                    _LOGGER.warning("===> Got fake_sleep_0 - TV going to standby")
+                    new_state = STATE_STANDBY
+                else:
+                    _LOGGER.warning("===> Got response with statetype %s - TV is on", statetype)
+                    new_state = STATE_PLAYING
         except JSONDecodeError:
-            # Selbst bei ungültigem JSON oder (null) - TV antwortet, also ist er an
+            _LOGGER.warning("===> Got non-JSON response - TV is responding")
             new_state = STATE_PLAYING
             payload = {}
             statetype = None
             
-        _LOGGER.debug("TV response received. Payload: %s, Old state: %s, New state: %s", 
-                     msg.payload, self._state, new_state)
-                     
+        _LOGGER.warning("===> State transition: %s -> %s", self._state, new_state)
         self._state = new_state
+        # Wichtig: Status sofort aktualisieren
+        self.async_write_ha_state()
 
         # If TV is turning on, do some initial publishes
         if self._state in (STATE_OFF, STATE_STANDBY) and new_state == STATE_PLAYING:
