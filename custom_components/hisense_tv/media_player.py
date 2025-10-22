@@ -89,7 +89,7 @@ async def async_setup_platform(hass, config, async_add_devices, discovery_info=N
 
     hass.async_create_task(
         hass.config_entries.flow.async_init(
-            DOMAIN, context={\"source\": SOURCE_IMPORT}, data=entry_data
+            DOMAIN, context={"source": SOURCE_IMPORT}, data=entry_data
         )
     )
 
