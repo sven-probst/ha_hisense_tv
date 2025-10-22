@@ -168,6 +168,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._starttime = None
         self._position = None
         self._media_position_updated_at = dt_util.utcnow()
+        self._pending_poll_response = False
 
         self._sourcelist_requested = False
     @property
@@ -216,6 +217,15 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             _LOGGER.debug("async_update called, but polling is disabled for this entity.")
             return
 
+        # If the TV is on, check if the last poll timed out
+        if self._state != STATE_OFF and self._pending_poll_response:
+            _LOGGER.warning("Hisense TV did not respond to the last poll, marking as off.")
+            self._pending_poll_response = False  # Reset for the next cycle
+            self._state = STATE_OFF
+            self.async_write_ha_state()
+            return  # Exit to reflect the new OFF state immediately
+
+        # Standard polling interval check
         if (
             not self._force_trigger
             and dt_util.utcnow() - self._last_trigger < timedelta(minutes=1)
@@ -227,12 +237,15 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._force_trigger = False
         self._last_trigger = dt_util.utcnow()
 
-        await mqtt.async_publish(
-            hass=self._hass,
-            topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/gettvstate"),
-            payload="",
-            retain=False,
-        )
+        # If the TV is on, set the pending flag and send the poll request
+        if self._state != STATE_OFF:
+            self._pending_poll_response = True
+            await mqtt.async_publish(
+                hass=self._hass,
+                topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/gettvstate"),
+                payload="",
+                retain=False,
+            )
 
     async def async_turn_on(self, **kwargs):
         """Turn the media player on."""
@@ -497,6 +510,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def _message_received_turnoff(self, msg):
         """Run when new MQTT message has been received."""
+        self._pending_poll_response = False
         _LOGGER.debug("message_received_turnoff: TV is entering standby or deep sleep.")
         self._sourcelist_requested = False  # Reset flag when TV turns off
         self._state = STATE_OFF  # Assume deep sleep (WoL needed), as standby is also covered.
@@ -536,6 +550,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def _message_received_state(self, msg):
         """Run when new MQTT message has been received."""
+        self._pending_poll_response = False
         if msg.retain:
             _LOGGER.debug("message_received_state - skip retained message")
             return
