@@ -483,9 +483,17 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             self._message_received_turnoff,
         )
 
+        # Subscribe to TV state changes
         self._subscriptions["state"] = await mqtt.async_subscribe(
             self._hass,
             self._in_topic("/remoteapp/mobile/broadcast/ui_service/state"),
+            self._message_received_state,
+        )
+        
+        # Subscribe to hotelmode changes - this is the TV's response to our state requests
+        self._subscriptions["hotelmode"] = await mqtt.async_subscribe(
+            self._hass,
+            self._in_topic("/remoteapp/mobile/broadcast/ui_service/data/hotelmodechange"),
             self._message_received_state,
         )
 
