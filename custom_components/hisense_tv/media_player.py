@@ -1,4 +1,4 @@
-"""Hisense TV media player entity.""
+"""Hisense TV media player entity."""
 from datetime import timedelta
 import functools
 import asyncio
