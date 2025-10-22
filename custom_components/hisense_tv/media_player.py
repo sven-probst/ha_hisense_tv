@@ -553,42 +553,32 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def _message_received_state(self, msg):
         """Run when new MQTT message has been received."""
-        _LOGGER.debug("Received state message - Payload: %s, Current state: %s", msg.payload, self._state)
-        
         if msg.retain:
             _LOGGER.debug("message_received_state - skip retained message")
             return
 
-        # Any response from TV (except retained messages) means it's responsive
+        # TV hat geantwortet, also Poll-Response zurücksetzen
         self._pending_poll_response = False
-
+        
+        # Wenn der TV antwortet, behandeln wir ihn als eingeschaltet,
+        # es sei denn er meldet explizit dass er aus ist
         try:
             payload = json.loads(msg.payload)
-        except JSONDecodeError:
-            payload = {}
-            if msg.payload == "(null)":
-                _LOGGER.debug("Got (null) response - TV is responsive")
+            statetype = payload.get("statetype")
+            if statetype == "fake_sleep_0":
+                new_state = STATE_STANDBY
+            else:
                 new_state = STATE_PLAYING
-                self._state = new_state
-                self.async_write_ha_state()
-                return
-
-        statetype = payload.get("statetype")
-        _LOGGER.debug("message_received_state - statetype: %s", statetype)
-
-        # Determine the new state based on statetype
-        if statetype == "fake_sleep_0":
-            new_state = STATE_STANDBY
-        elif statetype in ("sourceswitch", "livetv", "remote_launcher", "app"):
+        except JSONDecodeError:
+            # Selbst bei ungültigem JSON oder (null) - TV antwortet, also ist er an
             new_state = STATE_PLAYING
-        elif not statetype and self._state in (STATE_OFF, STATE_STANDBY):
-            # No specific state but TV is responding - consider it on
-            _LOGGER.debug("No specific state but TV is responsive - assuming ON")
-            new_state = STATE_PLAYING
-        else:
-            # Keep current state but TV is clearly responsive
-            new_state = self._state
-            _LOGGER.debug("Keeping current state %s for response: %s", self._state, msg.payload)
+            payload = {}
+            statetype = None
+            
+        _LOGGER.debug("TV response received. Payload: %s, Old state: %s, New state: %s", 
+                     msg.payload, self._state, new_state)
+                     
+        self._state = new_state
 
         # If TV is turning on, do some initial publishes
         if self._state in (STATE_OFF, STATE_STANDBY) and new_state == STATE_PLAYING:
