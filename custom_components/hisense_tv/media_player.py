@@ -104,7 +104,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     mqtt_in = config_entry.data[CONF_MQTT_IN]
     mqtt_out = config_entry.data[CONF_MQTT_OUT]
     uid = config_entry.unique_id
-    enable_polling = config_entry.data.get(CONF_ENABLE_POLLING, False)
+    enable_polling = config_entry.options.get(CONF_ENABLE_POLLING, config_entry.data.get(CONF_ENABLE_POLLING, False))
     if uid is None:
         uid = config_entry.entry_id
 
