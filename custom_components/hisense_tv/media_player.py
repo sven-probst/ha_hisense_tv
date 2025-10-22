@@ -217,7 +217,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             _LOGGER.debug("async_update called, but polling is disabled for this entity.")
             return
 
-        # If the TV is on, check if the last poll timed out
+        # If the TV was considered ON and the last poll timed out, mark it as OFF.
         if self._state != STATE_OFF and self._pending_poll_response:
             _LOGGER.warning("Hisense TV did not respond to the last poll, marking as off.")
             self._pending_poll_response = False  # Reset for the next cycle
@@ -237,15 +237,18 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._force_trigger = False
         self._last_trigger = dt_util.utcnow()
 
-        # If the TV is on, set the pending flag and send the poll request
-        if self._state != STATE_OFF:
-            self._pending_poll_response = True
-            await mqtt.async_publish(
-                hass=self._hass,
-                topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/gettvstate"),
-                payload="",
-                retain=False,
-            )
+        # Set the pending flag before polling. If the TV is already on,
+        # this allows us to detect a timeout on the next cycle.
+        self._pending_poll_response = True
+        
+        # Always poll for the state, regardless of the current state in HA.
+        # This is how we detect if the TV was turned on manually.
+        await mqtt.async_publish(
+            hass=self._hass,
+            topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/gettvstate"),
+            payload="",
+            retain=False,
+        )
 
     async def async_turn_on(self, **kwargs):
         """Turn the media player on."""
