@@ -570,18 +570,18 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             return
 
         # Determine the new state based on statetype
-        if statetype in ("sourceswitch", "livetv", "remote_launcher", "app"):
-            new_state = STATE_PLAYING
-        elif statetype == "fake_sleep_0":
+        # Only set state to off/standby if explicitly indicated
+        if statetype == "fake_sleep_0":
             new_state = STATE_STANDBY
+        elif not self._pending_poll_response and (not payload or payload == "(null)" or statetype or msg.payload == "(null)"):
+            # Any response from TV indicates it's on, unless explicitly off or we have a pending timeout
+            new_state = STATE_PLAYING
+            _LOGGER.debug("Got response from TV, assuming it's on: %s", msg.payload)
         else:
-            # If statetype is unknown, but the TV was off, assume it's turning on.
-            # This handles cases like the 'hotelmodechange' message.
-            if self._state in (STATE_OFF, STATE_STANDBY):
-                _LOGGER.debug("Unknown statetype '%s', but TV was off. Assuming it is turning on.", statetype)
-                new_state = STATE_PLAYING
-            else:
-                new_state = self._state
+            # Keep current state if we can't determine or if we're waiting for a timeout
+            new_state = self._state
+            _LOGGER.debug("Keeping current state %s. Pending timeout: %s, Response: %s", 
+                         self._state, self._pending_poll_response, msg.payload)
 
         # If TV is turning on, do some initial publishes
         if self._state in (STATE_OFF, STATE_STANDBY) and new_state == STATE_PLAYING:
