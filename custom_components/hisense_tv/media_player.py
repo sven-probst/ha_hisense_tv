@@ -225,7 +225,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             _LOGGER.debug("Skip update")
             return
 
-        _LOGGER.warning("===> Running update. Current state: %s, Pending response: %s", 
+        _LOGGER.debug("Running update. Current state: %s, Pending response: %s", 
                      self._state, self._pending_poll_response)
         self._force_trigger = False
         self._last_trigger = dt_util.utcnow()
@@ -553,7 +553,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def _message_received_state(self, msg):
         """Run when new MQTT message has been received."""
-        _LOGGER.warning("===> _message_received_state called with payload: %s", msg.payload)
+        _LOGGER.debug("_message_received_state called with payload: %s", msg.payload)
         
         if msg.retain:
             _LOGGER.debug("message_received_state - skip retained message")
@@ -561,30 +561,30 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
         # TV hat geantwortet, also Poll-Response zurücksetzen
         self._pending_poll_response = False
-        _LOGGER.warning("===> Setting pending_poll_response to False")
+        _LOGGER.debug("Setting pending_poll_response to False")
         
         # Wenn der TV antwortet, behandeln wir ihn als eingeschaltet,
         # es sei denn er meldet explizit dass er aus ist
         try:
             if msg.payload == "(null)":
-                _LOGGER.warning("===> Got (null) response - TV is responding")
+                _LOGGER.debug("Got (null) response - TV is responding")
                 new_state = STATE_PLAYING
             else:
                 payload = json.loads(msg.payload)
                 statetype = payload.get("statetype")
                 if statetype == "fake_sleep_0":
-                    _LOGGER.warning("===> Got fake_sleep_0 - TV going to standby")
+                    _LOGGER.debug("Got fake_sleep_0 - TV going to standby")
                     new_state = STATE_STANDBY
                 else:
-                    _LOGGER.warning("===> Got response with statetype %s - TV is on", statetype)
+                    _LOGGER.debug("Got response with statetype %s - TV is on", statetype)
                     new_state = STATE_PLAYING
         except JSONDecodeError:
-            _LOGGER.warning("===> Got non-JSON response - TV is responding")
+            _LOGGER.debug("Got non-JSON response - TV is responding")
             new_state = STATE_PLAYING
             payload = {}
             statetype = None
             
-        _LOGGER.warning("===> State transition: %s -> %s", self._state, new_state)
+        _LOGGER.debug("State transition: %s -> %s", self._state, new_state)
         self._state = new_state
         # Wichtig: Status sofort aktualisieren
         self.async_write_ha_state()
