@@ -1,4 +1,4 @@
-"""Hisense TV media player entity."""
+"""Hisense TV media player entity.""
 from datetime import timedelta
 import functools
 import asyncio
@@ -48,7 +48,7 @@ from .helper import HisenseTvBase, mqtt_pub_sub
 
 REQUIREMENTS = []
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__) 
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
@@ -89,7 +89,7 @@ async def async_setup_platform(hass, config, async_add_devices, discovery_info=N
 
     hass.async_create_task(
         hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": SOURCE_IMPORT}, data=entry_data
+            DOMAIN, context={\"source\": SOURCE_IMPORT}, data=entry_data
         )
     )
 
@@ -575,8 +575,13 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         elif statetype == "fake_sleep_0":
             new_state = STATE_STANDBY
         else:
-            # If statetype is unknown, don't change the state
-            new_state = self._state
+            # If statetype is unknown, but the TV was off, assume it's turning on.
+            # This handles cases like the 'hotelmodechange' message.
+            if self._state in (STATE_OFF, STATE_STANDBY):
+                _LOGGER.debug("Unknown statetype '%s', but TV was off. Assuming it is turning on.", statetype)
+                new_state = STATE_PLAYING
+            else:
+                new_state = self._state
 
         # If TV is turning on, do some initial publishes
         if self._state in (STATE_OFF, STATE_STANDBY) and new_state == STATE_PLAYING:
@@ -762,7 +767,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                         # httpIcon must exist and be a string
                         http_icon = item.get("httpIcon")
                         if isinstance(http_icon, str):
-                            match = re.search(r'https?://[^\s]+', http_icon)
+                            match = re.search(r'https?://[^\\s]+', http_icon)
                             thumbnail = match.group(0) if match else None
                         else:
                             thumbnail = None
