@@ -169,6 +169,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._position = None
         self._media_position_updated_at = dt_util.utcnow()
         self._pending_poll_response = False
+        self._missed_polls = 0
 
         self._sourcelist_requested = False
     @property
@@ -225,8 +226,20 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             _LOGGER.debug("Skip update")
             return
 
-        _LOGGER.debug("Running update. Current state: %s, Pending response: %s", 
-                     self._state, self._pending_poll_response)
+        _LOGGER.debug("Running update. Current state: %s, Pending response: %s, Missed polls: %d", 
+                     self._state, self._pending_poll_response, self._missed_polls)
+
+        if self._pending_poll_response:
+            self._missed_polls += 1
+            # If we miss 2 consecutive polls, we assume the TV is off.
+            if self._missed_polls >= 2 and self._state != STATE_OFF:
+                _LOGGER.info("TV did not respond to 2 consecutive state requests. Assuming it's off.")
+                self._state = STATE_OFF
+                self.async_write_ha_state()
+        else:
+            # If we received a response, reset the missed polls counter.
+            self._missed_polls = 0
+
         self._force_trigger = False
         self._last_trigger = dt_util.utcnow()
 
@@ -559,12 +572,12 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             _LOGGER.debug("message_received_state - skip retained message")
             return
 
-        # TV hat geantwortet, also Poll-Response zurücksetzen
+        # TV responded, so reset poll response
         self._pending_poll_response = False
         _LOGGER.debug("Setting pending_poll_response to False")
         
-        # Wenn der TV antwortet, behandeln wir ihn als eingeschaltet,
-        # es sei denn er meldet explizit dass er aus ist
+        # If the TV responds, we treat it as on,
+        # unless it explicitly reports that it is off
         try:
             if msg.payload == "(null)":
                 _LOGGER.debug("Got (null) response - TV is responding")
@@ -586,7 +599,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             
         _LOGGER.debug("State transition: %s -> %s", self._state, new_state)
         self._state = new_state
-        # Wichtig: Status sofort aktualisieren
+        # Important: update status immediately
         self.async_write_ha_state()
 
         # If TV is turning on, do some initial publishes
