@@ -1,16 +1,11 @@
 send_key:
   name: Send Key(s)
   description: Sends one or more specific key commands to a Hisense TV.
+  target:
+    entity:
+      integration: hisense_tv
+      domain: media_player
   fields:
-    entity_id:
-      name: Target TV
-      example: media_player.hisense_tv_livingroom
-      description: The entity ID of the Hisense TV to send the key(s) to (e.g., media_player.hisense_tv_wohnzimmer).
-      required: true
-      selector:
-        entity:
-          domain: media_player # Oder switch, je nachdem welche Entität du ansprechen willst
-          integration: hisense_tv
     key:
       name: Key(s)
       description: The key command(s) to send. Can be a single key or a list of keys.
@@ -94,20 +89,15 @@ send_key:
               value: '8'
             - label: Number 9
               value: '9'
-            # Füge hier weitere Keys hinzu
 
 send_channel:
   name: Send Channel
   description: Sends a channel number to a Hisense TV by sending an EXIT command first, then individual digits.
+  target:
+    entity:
+      integration: hisense_tv
+      domain: media_player
   fields:
-    entity_id:
-      name: Target TV
-      description: The entity ID of the Hisense TV to send the channel to.
-      required: true
-      selector:
-        entity:
-          domain: media_player
-          integration: hisense_tv
     channel:
       name: Channel Number
       description: The channel number to send (e.g., 1, 10, 101).
@@ -116,4 +106,65 @@ send_channel:
       selector:
         number:
           min: 0
-          max: 9999 # Max. Kanalnummer nach Bedarf anpassen
+          max: 9999
+
+launch_app:
+  name: Launch Application
+  description: Launches an application on the Hisense TV.
+  target:
+    entity:
+      integration: hisense_tv
+      domain: media_player
+  fields:
+    app_name:
+      name: Application Name
+      description: The name of the application to launch (e.g., "youtube", "netflix").
+      required: true
+      example: "youtube"
+      selector:
+        text:
+
+send_text:
+  name: Send Text
+  description: Sends a text string to the Hisense TV.
+  target:
+    entity:
+      integration: hisense_tv
+      domain: media_player
+  fields:
+    text:
+      name: Text
+      description: The text string to send.
+      required: true
+      example: "Hello World"
+      selector:
+        text:
+
+send_mouse_event:
+  name: Send Mouse Event
+  description: Sends a relative mouse movement event to the Hisense TV.
+  target:
+    entity:
+      integration: hisense_tv
+      domain: media_player
+  fields:
+    dx:
+      name: Delta X
+      description: The relative horizontal movement.
+      required: true
+      example: 10
+      selector:
+        number:
+          min: -32768
+          max: 32767
+          step: 1
+    dy:
+      name: Delta Y
+      description: The relative vertical movement.
+      required: true
+      example: -10
+      selector:
+        number:
+          min: -32768
+          max: 32767
+          step: 1

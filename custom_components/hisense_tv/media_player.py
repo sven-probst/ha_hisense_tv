@@ -1,5 +1,6 @@
 """Hisense TV media player entity."""
 from datetime import timedelta
+import functools
 import asyncio
 import json
 from json.decoder import JSONDecodeError
@@ -29,14 +30,16 @@ from homeassistant.const import (
     CONF_MAC,
     CONF_NAME,
     STATE_OFF,
+    STATE_STANDBY,
     STATE_ON,
     STATE_PLAYING,
-)
-from homeassistant.helpers import config_validation as cv
+) 
+from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_registry as er
 
 from .const import (
     ATTR_CODE,
     CONF_MQTT_IN,
+    CONF_ENABLE_POLLING,
     CONF_MQTT_OUT,
     DEFAULT_NAME,
     DOMAIN,
@@ -45,7 +48,7 @@ from .helper import HisenseTvBase, mqtt_pub_sub
 
 REQUIREMENTS = []
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__) 
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
@@ -101,6 +104,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     mqtt_in = config_entry.data[CONF_MQTT_IN]
     mqtt_out = config_entry.data[CONF_MQTT_OUT]
     uid = config_entry.unique_id
+    enable_polling = config_entry.options.get(CONF_ENABLE_POLLING, config_entry.data.get(CONF_ENABLE_POLLING, False))
     if uid is None:
         uid = config_entry.entry_id
 
@@ -112,6 +116,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         mac=mac,
         uid=uid,
         ip_address=ip_address,
+        enable_polling=enable_polling,
     )
     async_add_entities([entity])
 
@@ -128,9 +133,9 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         mac: str,
         uid: str,
         ip_address: str,
+        enable_polling: bool,
     ):
-        HisenseTvBase.__init__(
-            self=self,
+        super().__init__(
             hass=hass,
             name=name,
             mqtt_in=mqtt_in,
@@ -139,8 +144,13 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             uid=uid,
             ip_address=ip_address,
         )
+        # Set a specific name to avoid conflicts with other integrations like DLNA.
+        # This results in a clean entity_id like 'media_player.living_room_tv_control'.
+        self._attr_name = f"{name} Control"
+        self._enable_polling = enable_polling
 
         self._muted = False
+        self._attr_unique_id = uid
         self._volume = 0
         self._state = STATE_OFF
         self._source_name = None
@@ -158,11 +168,14 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._starttime = None
         self._position = None
         self._media_position_updated_at = dt_util.utcnow()
+        self._pending_poll_response = False
+        self._missed_polls = 0
 
+        self._sourcelist_requested = False
     @property
     def should_poll(self):
         """Poll for non media_player updates."""
-        return True
+        return self._enable_polling
 
     @property
     def media_content_type(self):
@@ -176,14 +189,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         """Set the device class to TV."""
         _LOGGER.debug("device_class")
         return MediaPlayerDeviceClass.TV
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def icon(self):
-        return self._icon
 
     @property
     def supported_features(self):
@@ -202,20 +207,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         )
 
     @property
-    def unique_id(self):
-        """Return the unique id of the device."""
-        return self._unique_id
-
-    @property
-    def device_info(self):
-        """Return device info for this device."""
-        return {
-            "identifiers": {(DOMAIN, self._unique_id)},
-            "name": self._name,
-            "manufacturer": DEFAULT_NAME,
-        }
-
-    @property
     def state(self):
         """Return the state of the device."""
         _LOGGER.debug("state %s", self._state)
@@ -223,6 +214,11 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def async_update(self):
         """Get the latest data and updates the states."""
+        if not self._enable_polling:
+            _LOGGER.debug("async_update called, but polling is disabled for this entity.")
+            return
+
+        # Standard polling interval check
         if (
             not self._force_trigger
             and dt_util.utcnow() - self._last_trigger < timedelta(minutes=1)
@@ -230,37 +226,89 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             _LOGGER.debug("Skip update")
             return
 
-        _LOGGER.debug("Update. force=%s", self._force_trigger)
+        _LOGGER.debug("Running update. Current state: %s, Pending response: %s, Missed polls: %d", 
+                     self._state, self._pending_poll_response, self._missed_polls)
+
+        if self._pending_poll_response:
+            self._missed_polls += 1
+            # If we miss 2 consecutive polls, we assume the TV is off.
+            if self._missed_polls >= 2 and self._state != STATE_OFF:
+                _LOGGER.info("TV did not respond to 2 consecutive state requests. Assuming it's off.")
+                self._state = STATE_OFF
+                self.async_write_ha_state()
+        else:
+            # If we received a response, reset the missed polls counter.
+            self._missed_polls = 0
+
         self._force_trigger = False
         self._last_trigger = dt_util.utcnow()
 
+        # Set the pending flag before polling.
+        self._pending_poll_response = True
+        
+        # Always poll for the state, regardless of the current state in HA.
+        # This is how we detect if the TV was turned on manually.
         await mqtt.async_publish(
             hass=self._hass,
-            topic=self._out_topic(
-                "/remoteapp/tv/ui_service/%s/actions/gettvstate"
-            ),
+            topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/gettvstate"),
             payload="",
             retain=False,
         )
 
     async def async_turn_on(self, **kwargs):
         """Turn the media player on."""
-        _LOGGER.debug("turn_on %s (%s)", self._mac, self._ip_address)
-        if (self._ip_address):
-            wakeonlan.send_magic_packet(self._mac, ip_address=self._ip_address)
-        else:
-            wakeonlan.send_magic_packet(self._mac)
+        # If TV is already on, do nothing.
+        if self._state not in (STATE_OFF, STATE_STANDBY):
+            _LOGGER.debug("TV is already on (state: %s). Doing nothing.", self._state)
+            return
+
+        # If the TV is in deep sleep, only WoL will work.
+        if self._state == STATE_OFF:
+            _LOGGER.debug("Turning on TV from deep sleep with WoL for MAC: %s", self._mac)
+            wol_fn = functools.partial(wakeonlan.send_magic_packet, self._mac, ip_address=wakeonlan.BROADCAST_IP)
+            await self.hass.async_add_executor_job(wol_fn)
+        elif self._state == STATE_STANDBY:
+            _LOGGER.debug("Turning on TV from standby. Sending KEY_POWER and WoL as fallback.")
+            # Send KEY_POWER first for a quick wake-up from standby
+            await mqtt.async_publish(
+                hass=self._hass,
+                topic=self._out_topic("/remoteapp/tv/remote_service/%s/actions/sendkey"),
+                payload="KEY_POWER",
+                retain=False,
+            )
+            # Also send WoL as a fallback in case the TV entered deep sleep from standby
+            wol_fn = functools.partial(wakeonlan.send_magic_packet, self._mac, ip_address=wakeonlan.BROADCAST_IP)
+            await self.hass.async_add_executor_job(wol_fn)
+
+        # Optimistically update the state to provide immediate feedback.
+        self._state = STATE_PLAYING
+        self.async_write_ha_state()
 
 
     async def async_turn_off(self, **kwargs):
         """Turn off media player."""
-        _LOGGER.debug("turn_off")
+        # Do nothing if it's already off.
+        if self._state in (STATE_OFF, STATE_STANDBY):
+            _LOGGER.debug("TV is already off or in standby. Doing nothing.")
+            return
+
+        _LOGGER.debug("Sending KEY_POWER to turn off TV.")
         await mqtt.async_publish(
             hass=self._hass,
             topic=self._out_topic("/remoteapp/tv/remote_service/%s/actions/sendkey"),
             payload="KEY_POWER",
             retain=False,
         )
+        # Optimistically set the state to standby and update HA.
+        self._state = STATE_STANDBY
+        # Clear media-related attributes for a clean UI
+        self._title = None
+        self._channel_name = None
+        self._channel_num = None
+        self._starttime = None
+        self._endtime = None
+        self._position = None
+        self.async_write_ha_state()
 
     @property
     def is_volume_muted(self):
@@ -277,6 +325,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
     async def async_set_volume_level(self, volume):
         """Set volume level, range 0..1."""
         _LOGGER.debug("set_volume_level %s", volume)
+        # Optimistic update
         self._volume = int(volume * 100)
         await mqtt.async_publish(
             hass=self._hass,
@@ -285,12 +334,12 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             ),
             payload=self._volume,
         )
+        self.async_write_ha_state()
 
     async def async_volume_up(self):
         """Volume up the media player."""
         _LOGGER.debug("volume_up")
-        if self._volume < 100:
-            self._volume = self._volume + 1
+        # The TV will send a volumechange message, so we don't need an optimistic update.
         await mqtt.async_publish(
             hass=self._hass,
             topic=self._out_topic("/remoteapp/tv/remote_service/%s/actions/sendkey"),
@@ -300,8 +349,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
     async def async_volume_down(self):
         """Volume down media player."""
         _LOGGER.debug("volume_down")
-        if self._volume > 0:
-            self._volume = self._volume - 1
         await mqtt.async_publish(
             hass=self._hass,
             topic=self._out_topic("/remoteapp/tv/remote_service/%s/actions/sendkey"),
@@ -317,19 +364,23 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             topic=self._out_topic("/remoteapp/tv/remote_service/%s/actions/sendkey"),
             payload="KEY_MUTE",
         )
+        self.async_write_ha_state()
 
     @property
     def source_list(self):
         """List of available input sources."""
-        _LOGGER.debug("source_list")
-        if len(self._source_list) <= 1:
+        _LOGGER.debug("source_list property accessed.")
+        # Request the source list only once per power cycle if it's empty.
+        if not self._sourcelist_requested and len(self._source_list) <= 1:
+            _LOGGER.debug("Requesting source list from TV.")
+            self._sourcelist_requested = True  # Set flag to prevent re-requesting
             self._hass.async_create_task(
                 mqtt.async_publish(
                     hass=self._hass,
                     topic=self._out_topic(
                         "/remoteapp/tv/ui_service/%s/actions/sourcelist"
                     ),
-                    payload="0",
+                    payload="",
                 )
             )
         return sorted(list(self._source_list))
@@ -445,9 +496,17 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             self._message_received_turnoff,
         )
 
+        # Subscribe to TV state changes
         self._subscriptions["state"] = await mqtt.async_subscribe(
             self._hass,
             self._in_topic("/remoteapp/mobile/broadcast/ui_service/state"),
+            self._message_received_state,
+        )
+        
+        # Subscribe to hotelmode changes - this is the TV's response to our state requests
+        self._subscriptions["hotelmode"] = await mqtt.async_subscribe(
+            self._hass,
+            self._in_topic("/remoteapp/mobile/broadcast/ui_service/data/hotelmodechange"),
             self._message_received_state,
         )
 
@@ -467,8 +526,10 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def _message_received_turnoff(self, msg):
         """Run when new MQTT message has been received."""
-        _LOGGER.debug("message_received_turnoff")
-        self._state = STATE_OFF
+        self._pending_poll_response = False
+        _LOGGER.debug("message_received_turnoff: TV is entering standby or deep sleep.")
+        self._sourcelist_requested = False  # Reset flag when TV turns off
+        self._state = STATE_OFF  # Assume deep sleep (WoL needed), as standby is also covered.
         self.async_write_ha_state()
 
     async def _message_received_sourcelist(self, msg):
@@ -505,32 +566,59 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def _message_received_state(self, msg):
         """Run when new MQTT message has been received."""
+        _LOGGER.debug("_message_received_state called with payload: %s", msg.payload)
+        
         if msg.retain:
             _LOGGER.debug("message_received_state - skip retained message")
             return
 
+        # TV responded, so reset poll response
+        self._pending_poll_response = False
+        _LOGGER.debug("Setting pending_poll_response to False")
+        
+        # If the TV responds, we treat it as on,
+        # unless it explicitly reports that it is off
         try:
-            payload = json.loads(msg.payload)
+            if msg.payload == "(null)":
+                _LOGGER.debug("Got (null) response - TV is responding")
+                new_state = STATE_PLAYING
+            else:
+                payload = json.loads(msg.payload)
+                statetype = payload.get("statetype")
+                if statetype == "fake_sleep_0":
+                    _LOGGER.debug("Got fake_sleep_0 - TV going to standby")
+                    new_state = STATE_STANDBY
+                else:
+                    _LOGGER.debug("Got response with statetype %s - TV is on", statetype)
+                    new_state = STATE_PLAYING
         except JSONDecodeError:
+            _LOGGER.debug("Got non-JSON response - TV is responding")
+            new_state = STATE_PLAYING
             payload = {}
-        statetype = payload.get("statetype")
-        _LOGGER.debug("message_received_state %s", statetype)
+            statetype = None
+            
+        _LOGGER.debug("State transition: %s -> %s", self._state, new_state)
+        self._state = new_state
+        # Important: update status immediately
+        self.async_write_ha_state()
 
-        if self._state == STATE_OFF:
+        # If TV is turning on, do some initial publishes
+        if self._state in (STATE_OFF, STATE_STANDBY) and new_state == STATE_PLAYING:
             await mqtt.async_publish(
                 hass=self._hass,
-                topic=self._out_topic(
-                    "/remoteapp/tv/platform_service/%s/actions/getvolume"
-                ),
+                topic=self._out_topic("/remoteapp/tv/platform_service/%s/actions/getvolume"),
                 payload="",
             )
+            # Proactively request the source list when the TV turns on
+            _LOGGER.debug("TV is turning on, proactively requesting source list.")
+            self._sourcelist_requested = True
             await mqtt.async_publish(
-                hass=self._hass,
-                topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/sourcelist"),
-                payload="",
+                hass=self._hass, topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/sourcelist"), payload=""
             )
+        
+        self._state = new_state
 
-        self._state = STATE_PLAYING
+        # Update attributes based on statetype
         if statetype == "sourceswitch":
             # sourceid:
             # sourcename:
@@ -578,8 +666,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             self._position = None
         elif statetype == "remote_epg":
             pass
-        elif statetype == "fake_sleep_0":
-            self._state = STATE_OFF
+        # No need for fake_sleep_0 here as state is already set
 
         self.async_write_ha_state()
 
@@ -608,8 +695,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             async for msg in stream_get:
                 try:
                     payload_string = msg[0].payload
-                    if payload_string is None:
-                        _LOGGER.debug("Skipping empty receiver list")
+                    if not payload_string or not isinstance(payload_string, str):
+                        _LOGGER.debug("Skipping empty or invalid payload for channellistinfo")
                         break
                     payload = json.loads(payload_string)
                     self._channel_infos = {
@@ -658,21 +745,22 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             can_expand=True,
             children=[],
         )
-        sensor_entity_id = f"sensor.{self._name.lower().replace(' ', '_')}"
-        sensor_state = self._hass.states.get(sensor_entity_id)
 
-        if sensor_state and sensor_state.attributes:
-            device_info = sensor_state.attributes.get("device_info", {})
-            if isinstance(device_info, dict):  # test device_info is dictionary
-                transport_protocol = device_info.get("transport_protocol")
-            else:
-                _LOGGER.warning("device_info has no valid info: %s", device_info)
-                transport_protocol = None
+        # Get transport_protocol from the device registry in a robust way.
+        transport_protocol = None
+        entity_registry = er.async_get(self.hass)
+        device_registry = dr.async_get(self.hass) # This line is duplicated, but harmless.
+        device = device_registry.async_get_device(identifiers={(DOMAIN, self.unique_id)})
+        if device and device.sw_version:
+            # Assuming the sw_version from device info holds the transport_protocol
+            transport_protocol = device.sw_version
+        else:
+            _LOGGER.debug("Could not find device in registry or sw_version is missing. Falling back.")
 
         # dynamic topic based on available transport_protocol
         vidaaapplist_topic = (
             "/remoteapp/tv/ui_service/%s/actions/vidaaapplist"
-            if transport_protocol and transport_protocol != "1140"
+            if transport_protocol and str(transport_protocol) != "1140"
             else "/remoteapp/tv/ui_service/%s/actions/applist"
         )
 
@@ -687,8 +775,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             async for msg in stream_get:
                 try:
                     payload_string = msg[0].payload
-                    if payload_string is None:
-                        _LOGGER.debug("skipping empty app list")
+                    if not payload_string or not isinstance(payload_string, str):
+                        _LOGGER.debug("Skipping empty or invalid payload for applist")
                         break
                     payload = json.loads(payload_string)
                     _LOGGER.debug("payload %s", payload_string)
@@ -698,7 +786,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                         # httpIcon must exist and be a string
                         http_icon = item.get("httpIcon")
                         if isinstance(http_icon, str):
-                            match = re.search(r'https?://[^\s]+', http_icon)
+                            match = re.search(r'https?://[^\\s]+', http_icon)
                             thumbnail = match.group(0) if match else None
                         else:
                             thumbnail = None
@@ -777,8 +865,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             async for msg in stream_get:
                 try:
                     payload_string = msg[0].payload
-                    if payload_string is None:
-                        _LOGGER.debug("Skipping empty channel list")
+                    if not payload_string or not isinstance(payload_string, str):
+                        _LOGGER.debug("Skipping empty or invalid payload for channellist")
                         break
                     payload = json.loads(payload_string)
                     for item in payload.get("list"):
@@ -820,6 +908,42 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             app = self._app_list.get(media_id)
             payload = json.dumps(
                 {"appId": media_id, "name": app.get("name"), "url": app.get("url")}
+            )
+            await mqtt.async_publish(
+                hass=self._hass,
+                topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/launchapp"),
+                payload=payload,
+            )
+
+    async def async_launch_app(self, app_name: str):
+        """Launch an application by name."""
+        _LOGGER.debug("Launching app: %s", app_name)
+
+        if not self._app_list:
+            _LOGGER.debug("App list is empty, fetching it now.")
+            await self._build_app_list_node()
+
+        app_id_to_launch = None
+        app_to_launch = None
+
+        # Search for the app in the app list
+        for app_id, app_info in self._app_list.items():
+            if app_info.get("name", "").lower() == app_name.lower():
+                app_id_to_launch = app_id
+                app_to_launch = app_info
+                break
+
+        if app_id_to_launch and app_to_launch:
+            await self.async_play_media(media_type=MediaType.APP, media_id=app_id_to_launch)
+        else:
+            # Fallback for apps that are not in the list from the TV, but can be started.
+            # e.g. "hbbtv"
+            _LOGGER.info(
+                "App '%s' not found in the cached app list. Trying to launch by name.",
+                app_name,
+            )
+            payload = json.dumps(
+                {"appId": app_name, "name": app_name, "url": app_name}
             )
             await mqtt.async_publish(
                 hass=self._hass,
