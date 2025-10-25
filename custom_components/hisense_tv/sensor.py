@@ -69,6 +69,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         self._tv_info = {}  # store "gettvinfo"
         self._platform_capability = {}  # store "getplatformcapbility"
         self._ui_capability = {}  # store "capability"
+        self._picture_settings = {}  # store "picturesetting"
         self._last_trigger = dt_util.utcnow()
         self._force_trigger = False
 
@@ -119,6 +120,15 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             self._message_received_uicapability,
         )
 
+        # subscribe topic for "picturesetting"
+        self._subscriptions["picturesetting_broadcast"] = await mqtt.async_subscribe(
+            self._hass,
+            self._in_topic(
+                "/remoteapp/mobile/broadcast/platform_service/data/picturesetting"
+            ),
+            self._message_received_picturesetting_broadcast,
+        )
+
     async def _message_received_turnoff(self, msg):
         _LOGGER.debug("message_received_turnoff")
         self._is_available = False
@@ -145,7 +155,9 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             self.async_write_ha_state()
             return
 
-        _LOGGER.debug("Sensor received state update, marking as available and refreshing info.")
+        _LOGGER.debug(
+            "Sensor received state update, marking as available and refreshing info."
+        )
         self._is_available = True
         self._force_trigger = True
         self.async_write_ha_state()
@@ -233,6 +245,16 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         self._ui_capability = payload
         self.async_write_ha_state()
 
+    async def _message_received_picturesetting_broadcast(self, msg):
+        """received broadcast message 'picturesetting'."""
+        _LOGGER.info("Received picturesetting broadcast: %s", msg.payload)
+        try:
+            payload = json.loads(msg.payload)
+            self._picture_settings = payload
+            self.async_write_ha_state()
+        except JSONDecodeError:
+            _LOGGER.warning("error parsing 'picturesetting' broadcast: %s", msg.payload)
+
     @property
     def native_value(self):
         """Return the firmware version as the state."""
@@ -251,6 +273,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         attributes["tv_info"] = self._tv_info
         attributes["platform_capability"] = self._platform_capability
         attributes["ui_capability"] = self._ui_capability
+        attributes["picture_settings"] = self._picture_settings
         attributes["ip_address"] = self._ip_address
         return attributes
 
