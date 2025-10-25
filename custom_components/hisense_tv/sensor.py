@@ -258,7 +258,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
     @property
     def native_value(self):
         """Return the firmware version as the state."""
-        return self._device_info.get("firmware") if self._is_available else None
+        return self._device_info.get("tv_version") if self._is_available else None
 
     @property
     def available(self):
