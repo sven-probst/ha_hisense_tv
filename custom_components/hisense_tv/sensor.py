@@ -60,13 +60,15 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         )
         self.has_entity_name = True
         # This will be the name of the sensor entity.
-        self._attr_name = "Picture Settings"
+        self._attr_name = "TV Info"
         # This ensures the entity has a unique ID within the device.
-        self._attr_unique_id = f"{uid}_picturesettings"
+        self._attr_unique_id = f"{uid}_info"
         self._is_available = False
         self._state = {}
         self._device_info = {}  # store "getdeviceinfo"
         self._tv_info = {}  # store "gettvinfo"
+        self._platform_capability = {}  # store "getplatformcapbility"
+        self._ui_capability = {}  # store "capability"
         self._last_trigger = dt_util.utcnow()
         self._force_trigger = False
 
@@ -89,20 +91,6 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             self._message_received_turnon,
         )
 
-        self._subscriptions["picturesettings"] = await mqtt.async_subscribe(
-            self._hass,
-            self._in_topic("/remoteapp/mobile/%s/platform_service/data/picturesetting"),
-            self._message_received,
-        )
-
-        self._subscriptions["picturesettings_value"] = await mqtt.async_subscribe(
-            self._hass,
-            self._in_topic(
-                "/remoteapp/mobile/broadcast/platform_service/data/picturesetting"
-            ),
-            self._message_received_value,
-        )
-
         # subscribe topic for "gettvinfo"
         self._subscriptions["tvinfo"] = await mqtt.async_subscribe(
             self._hass,
@@ -117,18 +105,19 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             self._message_received_deviceinfo,
         )
 
-        # Proactively request picture settings when the entity is added.
-        # This ensures the sensor becomes available if the TV is already on.
-        _LOGGER.debug("Proactively requesting picture settings for sensor.")
-        await mqtt.async_publish(
-            hass=self._hass,
-            topic=self._out_topic(
-                "/remoteapp/tv/platform_service/%s/actions/picturesetting"
-            ),
-            payload="",
-            retain=False,
+        # subscribe topic for "getplatformcapbility"
+        self._subscriptions["platformcapability"] = await mqtt.async_subscribe(
+            self._hass,
+            self._in_topic("/remoteapp/mobile/%s/platform_service/data/getplatformcapbility"),
+            self._message_received_platformcapability,
         )
 
+        # subscribe topic for "capability"
+        self._subscriptions["uicapability"] = await mqtt.async_subscribe(
+            self._hass,
+            self._in_topic("/remoteapp/mobile/%s/ui_service/data/capability"),
+            self._message_received_uicapability,
+        )
 
     async def _message_received_turnoff(self, msg):
         _LOGGER.debug("message_received_turnoff")
@@ -141,6 +130,22 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             _LOGGER.debug("message_received_turnon - skip retained message")
             return
 
+        try:
+            payload = json.loads(msg.payload)
+            statetype = payload.get("statetype")
+        except (JSONDecodeError, AttributeError):
+            # If payload is not JSON or not a dict, assume TV is on
+            statetype = None
+
+        # The "state" topic is also used to signal the TV is going to standby.
+        # We only want to query the TV if it's not turning off.
+        if statetype == "fake_sleep_0":
+            _LOGGER.debug("Sensor received fake_sleep_0, marking as unavailable.")
+            self._is_available = False
+            self.async_write_ha_state()
+            return
+
+        _LOGGER.debug("Sensor received state update, marking as available and refreshing info.")
         self._is_available = True
         self._force_trigger = True
         self.async_write_ha_state()
@@ -163,6 +168,24 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             payload="",
             retain=False,
         )
+        # publish "getplatformcapbility"-Topic
+        await mqtt.async_publish(
+            hass=self._hass,
+            topic=self._out_topic(
+                "/remoteapp/tv/platform_service/%s/actions/getplatformcapbility"
+            ),
+            payload="",
+            retain=False,
+        )
+        # publish "capability"-Topic
+        await mqtt.async_publish(
+            hass=self._hass,
+            topic=self._out_topic(
+                "/remoteapp/tv/ui_service/%s/actions/capability"
+            ),
+            payload="",
+            retain=False,
+        )
 
     async def _message_received_deviceinfo(self, msg):
         """received message 'getdeviceinfo'."""
@@ -174,7 +197,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
 
         _LOGGER.debug("Received deviceinfo: %s", payload)
         self._device_info = payload
-        self.async_write_ha_state()    
+        self.async_write_ha_state()
 
     async def _message_received_tvinfo(self, msg):
         """received message 'gettvinfo'."""
@@ -186,44 +209,34 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
 
         _LOGGER.debug("Received tvinfo: %s", payload)
         self._tv_info = payload
-        self.async_write_ha_state()   
-
-
-    async def _message_received(self, msg):
-        self._is_available = True
-        try:
-            payload = json.loads(msg.payload)
-        except JSONDecodeError:
-            payload = {}
-        _LOGGER.debug("_message_received R(%s):\n%s", msg.retain, payload)
-        self._state = {
-            s.get("menu_id"): {"name": s.get("menu_name"), "value": s.get("menu_value")}
-            for s in payload.get("menu_info", [])
-        }
         self.async_write_ha_state()
 
-    async def _message_received_value(self, msg):
-        self._is_available = True
-        self._force_trigger = True
+    async def _message_received_platformcapability(self, msg):
+        """received message 'getplatformcapbility'."""
         try:
             payload = json.loads(msg.payload)
         except JSONDecodeError:
-            payload = {}
-        _LOGGER.debug("_message_received_value R(%s):\n%s", msg.retain, payload)
-        if "notify_value_changed" == payload.get("action"):
-            menu_id = payload.get("menu_id")
-            entry = self._state.get(menu_id)
-            if entry is not None:
-                entry["value"] = payload.get("menu_value")
-            else:
-                _LOGGER.debug("_message_received_value menu_id not found: %s", menu_id)
+            _LOGGER.warning("error parsing 'getplatformcapbility': %s", msg.payload)
+            return
+        _LOGGER.debug("Received platformcapability: %s", payload)
+        self._platform_capability = payload
+        self.async_write_ha_state()
 
+    async def _message_received_uicapability(self, msg):
+        """received message 'capability'."""
+        try:
+            payload = json.loads(msg.payload)
+        except JSONDecodeError:
+            _LOGGER.warning("error parsing 'capability': %s", msg.payload)
+            return
+        _LOGGER.debug("Received uicapability: %s", payload)
+        self._ui_capability = payload
         self.async_write_ha_state()
 
     @property
     def native_value(self):
-        """Return the number of picture settings found as the state."""
-        return len(self._state) if self._is_available else None
+        """Return the firmware version as the state."""
+        return self._device_info.get("firmware") if self._is_available else None
 
     @property
     def available(self):
@@ -233,10 +246,12 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
     @property
     def extra_state_attributes(self):
         """Return the state attributes of the sensor."""
-        attributes = {v["name"]: v["value"] for v in self._state.values()}
+        attributes = {}
         attributes["device_info"] = self._device_info
-        attributes["ip_address"] = self._ip_address
         attributes["tv_info"] = self._tv_info
+        attributes["platform_capability"] = self._platform_capability
+        attributes["ui_capability"] = self._ui_capability
+        attributes["ip_address"] = self._ip_address
         return attributes
 
     @property
