@@ -730,7 +730,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                                 BrowseMedia(
                                     title=item.get("list_name"),
                                     media_class=MediaClass.DIRECTORY,
-                                   
+                                )
+                            )   
                     except JSONDecodeError as err:
                         _LOGGER.warning(
                             "Could not build Media Library from '%s': %s", msg, err.msg
