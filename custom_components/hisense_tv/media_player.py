@@ -488,6 +488,11 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def async_added_to_hass(self):
         """Subscribe to MQTT events."""
+        # Request sourcelist if TV is already on when component loads
+        if self._state not in [STATE_OFF, STATE_STANDBY]:
+            _LOGGER.debug("TV appears to be on, requesting initial sourcelist")
+            await self._request_sourcelist()
+
         self._subscriptions["tvsleep"] = await mqtt.async_subscribe(
             self._hass,
             self._in_topic(
@@ -576,12 +581,13 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._pending_poll_response = False
         _LOGGER.debug("Setting pending_poll_response to False")
         
-        # If the TV responds, we treat it as on,
-        # unless it explicitly reports that it is off
         try:
             if msg.payload == "(null)":
                 _LOGGER.debug("Got (null) response - TV is responding")
                 new_state = STATE_PLAYING
+                # Request sourcelist if we haven't yet
+                if not self._sourcelist_requested:
+                    await self._request_sourcelist()
             else:
                 payload = json.loads(msg.payload)
                 statetype = payload.get("statetype")
@@ -591,12 +597,18 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                 else:
                     _LOGGER.debug("Got response with statetype %s - TV is on", statetype)
                     new_state = STATE_PLAYING
+                    # Request sourcelist if we haven't yet
+                    if not self._sourcelist_requested:
+                        await self._request_sourcelist()
         except JSONDecodeError:
             _LOGGER.debug("Got non-JSON response - TV is responding")
             new_state = STATE_PLAYING
             payload = {}
             statetype = None
-            
+            # Request sourcelist if we haven't yet
+            if not self._sourcelist_requested:
+                await self._request_sourcelist()
+
         _LOGGER.debug("State transition: %s -> %s", self._state, new_state)
         self._state = new_state
         # Important: update status immediately
@@ -985,3 +997,14 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                 topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/launchapp"),
                 payload=payload,
             )
+
+    async def _request_sourcelist(self):
+        """Helper method to request the sourcelist."""
+        _LOGGER.debug("Requesting sourcelist from TV")
+        self._sourcelist_requested = True
+        await mqtt.async_publish(
+            hass=self._hass,
+            topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/sourcelist"),
+            payload="",
+            retain=False
+        )
