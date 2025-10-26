@@ -540,11 +540,11 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             payload = []
         _LOGGER.debug("message_received_sourcelist R(%s):\n%s", msg.retain, payload)
         if len(payload) > 0:
-            # Only set state if not already playing
             if self._state != STATE_PLAYING:
                 self._state = STATE_PLAYING
             self._source_list = {s.get("sourcename"): s for s in payload}
             self._source_list["App"] = {}
+            _LOGGER.debug("Updated source_list: %s", self._source_list)
             self.async_write_ha_state()
 
     async def _message_received_volume(self, msg):
