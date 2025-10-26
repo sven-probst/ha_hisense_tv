@@ -746,16 +746,33 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             children=[],
         )
 
-        # Get transport_protocol from the device registry in a robust way.
+        #  get getdeviceinfo
+        stream_deviceinfo, unsubscribe_deviceinfo = await mqtt_pub_sub(
+            hass=self._hass,
+            pub=self._out_topic("/remoteapp/tv/platform_service/%s/actions/getdeviceinfo"),
+            sub=self._in_topic("/remoteapp/mobile/%s/platform_service/data/getdeviceinfo"),
+        )
+
         transport_protocol = None
-        entity_registry = er.async_get(self.hass)
-        device_registry = dr.async_get(self.hass) # This line is duplicated, but harmless.
-        device = device_registry.async_get_device(identifiers={(DOMAIN, self.unique_id)})
-        if device and device.sw_version:
-            # Assuming the sw_version from device info holds the transport_protocol
-            transport_protocol = device.sw_version
-        else:
-            _LOGGER.debug("Could not find device in registry or sw_version is missing. Falling back.")
+        try:
+            async for msg in stream_deviceinfo:
+                try:
+                    payload_string = msg[0].payload
+                    if payload_string is None:
+                        _LOGGER.debug("Skipping empty device info")
+                        break
+                    payload = json.loads(payload_string)
+                    transport_protocol = payload.get("transport_protocol")
+                    _LOGGER.debug("Transport Protocol: %s", transport_protocol)
+                except JSONDecodeError as err:
+                    _LOGGER.warning(
+                        "Could not parse device info from '%s': %s", msg, err.msg
+                    )
+                break
+        except asyncio.TimeoutError:
+            _LOGGER.debug("Timeout error - getdeviceinfo")
+        finally:
+            unsubscribe_deviceinfo()
 
         # dynamic topic based on available transport_protocol
         vidaaapplist_topic = (
