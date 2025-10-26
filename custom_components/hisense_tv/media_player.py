@@ -533,18 +533,19 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def _message_received_sourcelist(self, msg):
         """Run when new MQTT message has been received."""
-        if msg.retain:
-            _LOGGER.debug("_message_received_sourcelist - skip retained message")
-            return
+        # Remove the check for msg.retain to always process the message
         try:
             payload = json.loads(msg.payload)
         except JSONDecodeError:
             payload = []
         _LOGGER.debug("message_received_sourcelist R(%s):\n%s", msg.retain, payload)
         if len(payload) > 0:
-            self._state = STATE_PLAYING
+            # Only set state if not already playing
+            if self._state != STATE_PLAYING:
+                self._state = STATE_PLAYING
             self._source_list = {s.get("sourcename"): s for s in payload}
             self._source_list["App"] = {}
+            self.async_write_ha_state()
 
     async def _message_received_volume(self, msg):
         """Run when new MQTT message has been received."""
