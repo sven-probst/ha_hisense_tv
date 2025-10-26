@@ -681,12 +681,17 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             children=[],
         )
 
-        # Create tasks for both requests
-        channel_task = self._fetch_channel_list(node)
-        app_task = self._fetch_app_node(node)
+        # Add Applications node first to ensure it's always available
+        await self._fetch_app_node(node)
+        
+        # Try to fetch channel list, but don't wait too long
+        try:
+            await asyncio.wait_for(self._fetch_channel_list(node), timeout=2.0)
+        except asyncio.TimeoutError:
+            _LOGGER.debug("Channel list fetch timed out - continuing without channels")
+        except Exception as e:
+            _LOGGER.debug("Error fetching channel list: %s - continuing without channels", e)
 
-        # Run both tasks concurrently
-        await asyncio.gather(channel_task, app_task)
         return node
 
     async def _fetch_channel_list(self, node):
@@ -703,32 +708,33 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         )
 
         try:
-            async for msg in stream_get:
-                try:
-                    payload_string = msg[0].payload
-                    if not payload_string or not isinstance(payload_string, str):
-                        _LOGGER.debug("Skipping empty or invalid payload for channellistinfo")
-                        break
-                    payload = json.loads(payload_string)
-                    self._channel_infos = {
-                        item.get("list_para"): item for item in payload
-                    }
-                    for key, item in self._channel_infos.items():
-                        node.children.append(
-                            BrowseMedia(
-                                title=item.get("list_name"),
-                                media_class=MediaClass.DIRECTORY,
-                                media_content_type="channellistinfo",
-                                media_content_id=key,
-                                can_play=False,
-                                can_expand=True,
+            async with asyncio.timeout(2.0):  # Lokales Timeout für die Channel-Liste
+                async for msg in stream_get:
+                    try:
+                        payload_string = msg[0].payload
+                        if not payload_string or not isinstance(payload_string, str):
+                            _LOGGER.debug("Skipping empty or invalid payload for channellistinfo")
+                            break
+                        payload = json.loads(payload_string)
+                        self._channel_infos = {
+                            item.get("list_para"): item for item in payload
+                        }
+                        for key, item in self._channel_infos.items():
+                            node.children.append(
+                                BrowseMedia(
+                                    title=item.get("list_name"),
+                                    media_class=MediaClass.DIRECTORY,
+                                    media_content_type="channellistinfo",
+                                    media_content_id=key,
+                                    can_play=False,
+                                    can_expand=True,
+                                )
                             )
+                    except JSONDecodeError as err:
+                        _LOGGER.warning(
+                            "Could not build Media Library from '%s': %s", msg, err.msg
                         )
-                except JSONDecodeError as err:
-                    _LOGGER.warning(
-                        "Could not build Media Library from '%s': %s", msg, err.msg
-                    )
-                break
+                    break
         except asyncio.TimeoutError:
             _LOGGER.debug("timeout error - getchannellistinfo")
         finally:
