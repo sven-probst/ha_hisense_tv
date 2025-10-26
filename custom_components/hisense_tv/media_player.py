@@ -567,19 +567,20 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
     async def _message_received_state(self, msg):
         """Run when new MQTT message has been received."""
         _LOGGER.debug("_message_received_state called with payload: %s", msg.payload)
-        
         if msg.retain:
             _LOGGER.debug("message_received_state - skip retained message")
             return
 
-        # TV responded, so reset poll response
         self._pending_poll_response = False
         _LOGGER.debug("Setting pending_poll_response to False")
-        
+
         try:
             if msg.payload == "(null)":
                 _LOGGER.debug("Got (null) response - TV is responding")
                 new_state = STATE_PLAYING
+                # If sourcelist is empty, reset flag and force request
+                if len(self._source_list) <= 1:
+                    self._sourcelist_requested = False
                 await self._ensure_sourcelist()
             else:
                 payload = json.loads(msg.payload)
@@ -590,12 +591,16 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                 else:
                     _LOGGER.debug("Got response with statetype %s - TV is on", statetype)
                     new_state = STATE_PLAYING
+                    if len(self._source_list) <= 1:
+                        self._sourcelist_requested = False
                     await self._ensure_sourcelist()
         except JSONDecodeError:
             _LOGGER.debug("Got non-JSON response - TV is responding")
             new_state = STATE_PLAYING
             payload = {}
             statetype = None
+            if len(self._source_list) <= 1:
+                self._sourcelist_requested = False
             await self._ensure_sourcelist()
 
         _LOGGER.debug("State transition: %s -> %s", self._state, new_state)
@@ -725,12 +730,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                                 BrowseMedia(
                                     title=item.get("list_name"),
                                     media_class=MediaClass.DIRECTORY,
-                                    media_content_type="channellistinfo",
-                                    media_content_id=key,
-                                    can_play=False,
-                                    can_expand=True,
-                                )
-                            )
+                                   
                     except JSONDecodeError as err:
                         _LOGGER.warning(
                             "Could not build Media Library from '%s': %s", msg, err.msg
