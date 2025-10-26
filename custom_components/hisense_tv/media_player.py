@@ -375,19 +375,10 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
     def source_list(self):
         """List of available input sources."""
         _LOGGER.debug("source_list property accessed.")
-        # Request the source list only once per power cycle if it's empty.
+        # Always ensure sourcelist is requested if empty and not already requested
         if not self._sourcelist_requested and len(self._source_list) <= 1:
-            _LOGGER.debug("Requesting source list from TV.")
-            self._sourcelist_requested = True  # Set flag to prevent re-requesting
-            self._hass.async_create_task(
-                mqtt.async_publish(
-                    hass=self._hass,
-                    topic=self._out_topic(
-                        "/remoteapp/tv/ui_service/%s/actions/sourcelist"
-                    ),
-                    payload="",
-                )
-            )
+            _LOGGER.debug("Requesting source list from TV (via ensure_sourcelist).")
+            self._hass.async_create_task(self._ensure_sourcelist())
         return sorted(list(self._source_list))
 
     @property
@@ -493,10 +484,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def async_added_to_hass(self):
         """Subscribe to MQTT events."""
-        # Request sourcelist if TV is already on when component loads
-        if self._state not in [STATE_OFF, STATE_STANDBY]:
-            _LOGGER.debug("TV appears to be on, requesting initial sourcelist")
-            await self._request_sourcelist()
+        # Remove the check for self._state and _request_sourcelist here
+        # ...existing code...
 
         self._subscriptions["tvsleep"] = await mqtt.async_subscribe(
             self._hass,
@@ -606,9 +595,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             new_state = STATE_PLAYING
             payload = {}
             statetype = None
-            # Request sourcelist if we haven't yet
-            if not self._sourcelist_requested:
-                await self._request_sourcelist()
+            await self._ensure_sourcelist()
 
         _LOGGER.debug("State transition: %s -> %s", self._state, new_state)
         self._state = new_state
