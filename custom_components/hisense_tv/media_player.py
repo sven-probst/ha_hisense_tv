@@ -681,6 +681,16 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             children=[],
         )
 
+        # Create tasks for both requests
+        channel_task = self._fetch_channel_list(node)
+        app_task = self._fetch_app_node(node)
+
+        # Run both tasks concurrently
+        await asyncio.gather(channel_task, app_task)
+        return node
+
+    async def _fetch_channel_list(self, node):
+        """Fetch the channel list and add to node."""
         stream_get, unsubscribe_getchannellistinfo = await mqtt_pub_sub(
             hass=self._hass,
             pub=self._out_topic(
@@ -689,6 +699,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             sub=self._in_topic(
                 "/remoteapp/mobile/%s/platform_service/data/getchannellistinfo"
             ),
+            payload="{}",
         )
 
         try:
@@ -723,6 +734,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         finally:
             unsubscribe_getchannellistinfo()
 
+    async def _fetch_app_node(self, node):
+        """Fetch and add the Applications node."""
         node.children.append(
             BrowseMedia(
                 title="Applications",
@@ -733,7 +746,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                 can_expand=True,
             )
         )
-        return node
 
     async def _build_app_list_node(self):
         node = BrowseMedia(
