@@ -533,15 +533,13 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def _message_received_sourcelist(self, msg):
         """Run when new MQTT message has been received."""
-        # Remove the check for msg.retain to always process the message
         try:
             payload = json.loads(msg.payload)
         except JSONDecodeError:
             payload = []
         _LOGGER.debug("message_received_sourcelist R(%s):\n%s", msg.retain, payload)
         if len(payload) > 0:
-            if self._state != STATE_PLAYING:
-                self._state = STATE_PLAYING
+            # Do NOT set self._state here for broadcast/retained messages!
             self._source_list = {s.get("sourcename"): s for s in payload}
             self._source_list["App"] = {}
             _LOGGER.debug("Updated source_list: %s", self._source_list)
@@ -567,21 +565,14 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
     async def _message_received_state(self, msg):
         """Run when new MQTT message has been received."""
         _LOGGER.debug("_message_received_state called with payload: %s", msg.payload)
-        if msg.retain:
-            _LOGGER.debug("message_received_state - skip retained message")
-            return
 
-        self._pending_poll_response = False
-        _LOGGER.debug("Setting pending_poll_response to False")
-
+        # Always process payload for UI, but only update state if not retained
         try:
             if msg.payload == "(null)":
                 _LOGGER.debug("Got (null) response - TV is responding")
                 new_state = STATE_PLAYING
-                # If sourcelist is empty, reset flag and force request
-                if len(self._source_list) <= 1:
-                    self._sourcelist_requested = False
-                await self._ensure_sourcelist()
+                payload = {}
+                statetype = None
             else:
                 payload = json.loads(msg.payload)
                 statetype = payload.get("statetype")
@@ -591,45 +582,14 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                 else:
                     _LOGGER.debug("Got response with statetype %s - TV is on", statetype)
                     new_state = STATE_PLAYING
-                    if len(self._source_list) <= 1:
-                        self._sourcelist_requested = False
-                    await self._ensure_sourcelist()
         except JSONDecodeError:
             _LOGGER.debug("Got non-JSON response - TV is responding")
             new_state = STATE_PLAYING
             payload = {}
             statetype = None
-            if len(self._source_list) <= 1:
-                self._sourcelist_requested = False
-            await self._ensure_sourcelist()
 
-        _LOGGER.debug("State transition: %s -> %s", self._state, new_state)
-        self._state = new_state
-        # Important: update status immediately
-        self.async_write_ha_state()
-
-        # If TV is turning on, do some initial publishes
-        if self._state in (STATE_OFF, STATE_STANDBY) and new_state == STATE_PLAYING:
-            await mqtt.async_publish(
-                hass=self._hass,
-                topic=self._out_topic("/remoteapp/tv/platform_service/%s/actions/getvolume"),
-                payload="",
-            )
-            # Proactively request the source list when the TV turns on
-            _LOGGER.debug("TV is turning on, proactively requesting source list.")
-            self._sourcelist_requested = True
-            await mqtt.async_publish(
-                hass=self._hass, topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/sourcelist"), payload=""
-            )
-        
-        self._state = new_state
-
-        # Update attributes based on statetype
+        # Update attributes based on statetype (always, even for retained)
         if statetype == "sourceswitch":
-            # sourceid:
-            # sourcename:
-            # is_signal:
-            # displayname:
             self._source_name = payload.get("sourcename")
             self._source_id = payload.get("sourceid")
             self._title = payload.get("displayname")
@@ -639,13 +599,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             self._endtime = None
             self._position = None
         elif statetype == "livetv":
-            # progname:
-            # channel_num:
-            # channel_name:
-            # sourceid:
-            # detail:
-            # starttime:
-            # endtime:
             self._source_name = "TV"
             self._title = payload.get("progname")
             self._channel_name = payload.get("channel_name")
@@ -661,8 +614,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             self._endtime = None
             self._position = None
         elif statetype == "app":
-            # name:
-            # url:
             self._source_name = "App"
             self._title = payload.get("name")
             self._channel_name = payload.get("url")
@@ -672,9 +623,17 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             self._position = None
         elif statetype == "remote_epg":
             pass
-        # No need for fake_sleep_0 here as state is already set
 
-        self.async_write_ha_state()
+        # Only update state if NOT retained
+        if not msg.retain:
+            self._pending_poll_response = False
+            _LOGGER.debug("Setting pending_poll_response to False")
+            _LOGGER.debug("State transition: %s -> %s", self._state, new_state)
+            self._state = new_state
+            self.async_write_ha_state()
+        else:
+            # For retained, just update attributes/UI, but not the state
+            self.async_write_ha_state()
 
     async def _build_library_node(self):
         node = BrowseMedia(
