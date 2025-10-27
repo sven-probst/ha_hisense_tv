@@ -379,7 +379,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         if not self._sourcelist_requested and len(self._source_list) <= 1:
             _LOGGER.debug("Requesting source list from TV (via ensure_sourcelist).")
             self._hass.async_create_task(self._ensure_sourcelist())
-        return sorted(list(self._source_list))
+        # Return the sources in the order received from the TV
+        return list(self._source_list)
 
     @property
     def source(self):
@@ -539,9 +540,17 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             payload = []
         _LOGGER.debug("message_received_sourcelist R(%s):\n%s", msg.retain, payload)
         if len(payload) > 0:
-            # Do NOT set self._state here for broadcast/retained messages!
-            self._source_list = {s.get("sourcename"): s for s in payload}
-            self._source_list["App"] = {}
+            # Build an ordered dict to preserve order from payload
+            from collections import OrderedDict
+            new_source_list = OrderedDict()
+            for s in payload:
+                name = s.get("sourcename")
+                if name:
+                    new_source_list[name] = s
+            # Add "App" only if not present
+            if "App" not in new_source_list:
+                new_source_list["App"] = {}
+            self._source_list = new_source_list
             _LOGGER.debug("Updated source_list: %s", self._source_list)
             self.async_write_ha_state()
 
@@ -629,8 +638,13 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             self._pending_poll_response = False
             _LOGGER.debug("Setting pending_poll_response to False")
             _LOGGER.debug("State transition: %s -> %s", self._state, new_state)
+            state_changed = self._state != new_state
             self._state = new_state
             self.async_write_ha_state()
+            # If TV is now running, query sourcelist and volume
+            if state_changed and new_state == STATE_PLAYING:
+                _LOGGER.debug("TV marked as running in HA, querying sourcelist and volume.")
+                await self._request_sourcelist()
         else:
             # For retained, just update attributes/UI, but not the state
             self.async_write_ha_state()
