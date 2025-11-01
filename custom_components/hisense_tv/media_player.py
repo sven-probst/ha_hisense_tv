@@ -917,7 +917,12 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         elif media_type == MediaType.APP:
             app = self._app_list.get(media_id)
             payload = json.dumps(
-                {"appId": media_id, "name": app.get("name"), "url": app.get("url")}
+                {
+                    "appId": media_id,
+                    "name": app.get("name"),
+                    "url": app.get("url"),
+                    "storeType": app.get("storeType"),
+                }
             )
             await mqtt.async_publish(
                 hass=self._hass,
@@ -953,7 +958,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                 app_name,
             )
             payload = json.dumps(
-                {"appId": app_name, "name": app_name, "url": app_name}
+                {"appId": app_name, "name": app_name, "url": app_name, "storeType": ""}
             )
             await mqtt.async_publish(
                 hass=self._hass,
