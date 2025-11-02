@@ -1027,5 +1027,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
     @property
     def extra_state_attributes(self):
         """Return the state attributes."""
-        attributes = {"input_text": self._input_text}
+        # Start with the base class attributes
+        attributes = super().extra_state_attributes or {}
+        # Add our custom attribute
+        attributes["input_text"] = self._input_text
         return attributes
