@@ -348,12 +348,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         if button_pressed and target_entity_id:
             # Mapping for keys where webOS name differs from Hisense key
             key_map = {
-                "LANGUAGE": "LANG",
-                "GUIDE":"EPG",
-                "BACK":"RETURNS",
-                "REWIND":"BACK",
-                "FAST_FORWARD":"FORWARDS"
-                # Add other special cases here if needed
+                "LANGUAGE": "LANG",       # Custom button
+                "GUIDE": "EPG",           # Standard webOS key
+                "BACK": "RETURNS",        # Standard webOS key
+                "ENTER": "OK",            # For 'center' button
+                "CENTER": "OK",           # Alias for 'center'
+                "VOLUME_UP": "VOLUMEUP",  # Standard webOS key
+                "VOLUME_DOWN": "VOLUMEDOWN",# Standard webOS key
+                "CAPTIONS": "SUBTITLE",   # Standard webOS key (assuming Hisense key is SUBTITLE)
+                "CC": "SUBTITLE",         # Alias for captions
+                # Keys like 'UP', 'DOWN', 'OK', 'HOME', 'MENU', 'POWER' match automatically
             }
 
             # Use the mapped key if it exists, otherwise use the original button name
@@ -381,14 +385,45 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     async def async_webostv_command_wrapper(call: ServiceCall):
         """Handles webostv.command (for keyboard) and wraps it to remote.send_command."""
+        target_entity_id = call.data.get(ATTR_ENTITY_ID)
+        if not target_entity_id:
+            return
+
+        # Case 1: Handle keyboard input (payload with text)
         payload = call.data.get("payload", {})
         text_to_send = payload.get("text")
         target_entity_id = call.data.get(ATTR_ENTITY_ID)
         _LOGGER.debug("webOS command wrapper called for text: %s", text_to_send)
         if text_to_send and target_entity_id:
             # Directly use the text for our send_text dispatcher case
+        if text_to_send is not None:
+            _LOGGER.debug("webOS command wrapper (keyboard) called for text: %s", text_to_send)
             await async_send_command_wrapper_service(
                 ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={ "command": text_to_send, ATTR_ENTITY_ID: target_entity_id })
+                ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": text_to_send, ATTR_ENTITY_ID: target_entity_id})
+            )
+            return
+
+        # Case 2: Handle generic commands (like media controls)
+        command = call.data.get("command")
+        if command:
+            _LOGGER.debug("webOS command wrapper (generic) called for command: %s", command)
+            command_map = {
+                # Media Controls
+                "media.controls/stop": "STOP",
+                "media.controls/play": "PLAY",
+                "media.controls/pause": "PAUSE",
+                "media.controls/rewind": "BACK",        # Hisense 'BACK' is rewind
+                "media.controls/fastForward": "FORWARDS", # Hisense 'FORWARDS' is fast-forward
+                # IME (Input Method Editor) Controls
+                "com.webos.service.ime/deleteCharacters": "BACKSPACE",
+                "com.webos.service.ime/sendEnterKey": "OK",
+            }
+            hisense_key = command_map.get(command)
+            if hisense_key:
+                _LOGGER.debug("Mapped webOS command '%s' to Hisense key '%s'", command, hisense_key)
+                await async_send_command_wrapper_service(
+                    ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": f"KEY:{hisense_key}", ATTR_ENTITY_ID: target_entity_id})
             )
 
     # Register the webOS compatibility services if the domain is available
