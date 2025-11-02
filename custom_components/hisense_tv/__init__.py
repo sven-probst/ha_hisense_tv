@@ -3,7 +3,7 @@ import asyncio
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, DOMAIN as HA_DOMAIN
 from homeassistant.components import mqtt
 from homeassistant.const import CONF_MAC, ATTR_ENTITY_ID
 from homeassistant.helpers import config_validation as cv
@@ -11,6 +11,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.service import async_extract_entity_ids
 import voluptuous as vol
 
+from homeassistant.components.remote import DOMAIN as REMOTE_DOMAIN
 from .const import ( 
     DOMAIN,
     SERVICE_SEND_KEY,
@@ -282,6 +283,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         DOMAIN, SERVICE_SEND_MOUSE_EVENT, async_send_mouse_event_service, schema=SEND_MOUSE_EVENT_SCHEMA
     )
 
+    # Wrapper service for universal-remote-card compatibility
+    async def async_send_command_wrapper_service(call: ServiceCall):
+        """
+        Handles remote.send_command and wraps it to hisense_tv.send_text.
+        The universal-remote-card uses 'command' as the parameter for text.
+        """
+        _LOGGER.debug("Wrapper service remote.send_command called with data: %s", call.data)
+        
+        # The universal-remote-card sends text in the 'command' field
+        text_to_send = call.data.get("command")
+
+        if not text_to_send:
+            _LOGGER.warning("remote.send_command called without 'command' data.")
+            return
+
+        # Re-use the existing send_text service logic by calling it directly
+        await async_send_text_service(
+            ServiceCall(
+                domain=DOMAIN,
+                service=SERVICE_SEND_TEXT,
+                data={ATTR_TEXT: text_to_send, ATTR_ENTITY_ID: call.data.get(ATTR_ENTITY_ID)},
+            )
+        )
+
+    # Register the wrapper service under the 'remote' domain
+    # This makes the integration natively compatible with the remote card's default keyboard action
+    hass.services.async_register(
+        REMOTE_DOMAIN, "send_command", async_send_command_wrapper_service
+    )
+
     return True
 
 
@@ -301,6 +332,7 @@ async def async_unload_entry(hass, entry):
     hass.services.async_remove(DOMAIN, SERVICE_LAUNCH_APP)
     hass.services.async_remove(DOMAIN, SERVICE_SEND_TEXT)
     hass.services.async_remove(DOMAIN, SERVICE_SEND_MOUSE_EVENT)
+    hass.services.async_remove(REMOTE_DOMAIN, "send_command")
 
     unload_ok = all(
         await asyncio.gather(
