@@ -1029,4 +1029,3 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         """Return the state attributes."""
         attributes = {"input_text": self._input_text}
         return attributes
-        )
