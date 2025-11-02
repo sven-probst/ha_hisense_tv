@@ -392,14 +392,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         # Case 1: Handle keyboard input (payload with text)
         payload = call.data.get("payload", {})
         text_to_send = payload.get("text")
-        target_entity_id = call.data.get(ATTR_ENTITY_ID)
-        _LOGGER.debug("webOS command wrapper called for text: %s", text_to_send)
-        if text_to_send and target_entity_id:
-            # Directly use the text for our send_text dispatcher case
         if text_to_send is not None:
             _LOGGER.debug("webOS command wrapper (keyboard) called for text: %s", text_to_send)
             await async_send_command_wrapper_service(
-                ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={ "command": text_to_send, ATTR_ENTITY_ID: target_entity_id })
                 ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": text_to_send, ATTR_ENTITY_ID: target_entity_id})
             )
             return
