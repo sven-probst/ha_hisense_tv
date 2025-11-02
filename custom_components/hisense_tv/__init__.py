@@ -363,7 +363,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             command_string = f"KEY:{hisense_key}"
             
             await async_send_command_wrapper_service(
-                ServiceCall(REMOTE_DOMAIN, "send_command", {"command": command_string, ATTR_ENTITY_ID: target_entity_id})
+                ServiceCall(domain=REMOTE_DOMAIN, service="send_command", data={ "command": command_string, ATTR_ENTITY_ID: target_entity_id })
             )
 
     async def async_webostv_launch_wrapper(call: ServiceCall):
@@ -376,7 +376,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             # We capitalize the app name as our dispatcher might expect it
             command_string = f"APP:{app_id.capitalize()}"
             await async_send_command_wrapper_service(
-                ServiceCall(REMOTE_DOMAIN, "send_command", { "command": command_string, ATTR_ENTITY_ID: target_entity_id })
+                ServiceCall(domain=REMOTE_DOMAIN, service="send_command", data={ "command": command_string, ATTR_ENTITY_ID: target_entity_id })
             )
 
     async def async_webostv_command_wrapper(call: ServiceCall):
@@ -388,7 +388,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         if text_to_send and target_entity_id:
             # Directly use the text for our send_text dispatcher case
             await async_send_command_wrapper_service(
-                ServiceCall(REMOTE_DOMAIN, "send_command", { "command": text_to_send, ATTR_ENTITY_ID: target_entity_id })
+                ServiceCall(domain=REMOTE_DOMAIN, service="send_command", data={ "command": text_to_send, ATTR_ENTITY_ID: target_entity_id })
             )
 
     # Register the webOS compatibility services if the domain is available
