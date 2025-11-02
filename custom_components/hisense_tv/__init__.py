@@ -346,10 +346,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         target_entity_id = call.data.get(ATTR_ENTITY_ID)
         _LOGGER.debug("webOS button wrapper called for button: %s", button_pressed)
         if button_pressed and target_entity_id:
-            # Translate webOS button to our KEY: format
-            command_string = f"KEY:{button_pressed.upper()}"
+            # Mapping for keys where webOS name differs from Hisense key
+            key_map = {
+                "LANGUAGE": "LANG",
+                "GUIDE":"EPG",
+                "BACK":"RETURNS",
+                "REWIND":"BACK",
+                "FAST_FORWARD":"FORWARDS"
+                # Add other special cases here if needed
+            }
+
+            # Use the mapped key if it exists, otherwise use the original button name
+            hisense_key = key_map.get(button_pressed.upper(), button_pressed.upper())
+
+            # Translate to our KEY: format
+            command_string = f"KEY:{hisense_key}"
+            
             await async_send_command_wrapper_service(
-                ServiceCall(REMOTE_DOMAIN, "send_command", { "command": command_string, ATTR_ENTITY_ID: target_entity_id })
+                ServiceCall(REMOTE_DOMAIN, "send_command", {"command": command_string, ATTR_ENTITY_ID: target_entity_id})
             )
 
     async def async_webostv_launch_wrapper(call: ServiceCall):
