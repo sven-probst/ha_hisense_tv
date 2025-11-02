@@ -12,6 +12,12 @@ from homeassistant.helpers.service import async_extract_entity_ids
 import voluptuous as vol
 
 from homeassistant.components.remote import DOMAIN as REMOTE_DOMAIN
+# Import webostv domain to register compatible services
+try:
+    from homeassistant.components.webostv.const import DOMAIN as WEBOSTV_DOMAIN
+except ImportError:
+    WEBOSTV_DOMAIN = "webostv"
+
 from .const import ( 
     DOMAIN,
     SERVICE_SEND_KEY,
@@ -286,32 +292,106 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # Wrapper service for universal-remote-card compatibility
     async def async_send_command_wrapper_service(call: ServiceCall):
         """
-        Handles remote.send_command and wraps it to hisense_tv.send_text.
-        The universal-remote-card uses 'command' as the parameter for text.
+        Handles remote.send_command and dispatches to the correct internal service
+        based on a prefix in the 'command' string.
+        - "KEY:UP" -> send_key
+        - "APP:Netflix" -> launch_app
+        - "any other text" -> send_text
         """
         _LOGGER.debug("Wrapper service remote.send_command called with data: %s", call.data)
         
-        # The universal-remote-card sends text in the 'command' field
-        text_to_send = call.data.get("command")
+        command_string = call.data.get("command")
+        target_entity_id = call.data.get(ATTR_ENTITY_ID)
 
-        if not text_to_send:
+        if not command_string:
             _LOGGER.warning("remote.send_command called without 'command' data.")
             return
 
-        # Re-use the existing send_text service logic by calling it directly
-        await async_send_text_service(
-            ServiceCall(
-                domain=DOMAIN,
-                service=SERVICE_SEND_TEXT,
-                data={ATTR_TEXT: text_to_send, ATTR_ENTITY_ID: call.data.get(ATTR_ENTITY_ID)},
+        # Dispatch based on prefix
+        if command_string.startswith("KEY:"):
+            key = command_string.split(":", 1)[1]
+            _LOGGER.debug("Dispatching to send_key with key: %s", key)
+            await async_send_key_service(
+                ServiceCall(domain=DOMAIN, service=SERVICE_SEND_KEY, data={ATTR_KEY: key, ATTR_ENTITY_ID: target_entity_id})
             )
-        )
+        elif command_string.startswith("APP:"):
+            app_name = command_string.split(":", 1)[1]
+            _LOGGER.debug("Dispatching to launch_app with app_name: %s", app_name)
+            # launch_app service calls the entity method directly, so we need to do the same
+            media_player_entity = hass.data["media_player"].get_entity(target_entity_id)
+            if media_player_entity:
+                await media_player_entity.async_launch_app(app_name)
+            else:
+                _LOGGER.error("Could not find media_player entity for dispatching launch_app: %s", target_entity_id)
+        else:
+            # Default to send_text if no prefix is found
+            _LOGGER.debug("Dispatching to send_text with text: %s", command_string)
+            await async_send_text_service(
+                ServiceCall(
+                    domain=DOMAIN, service=SERVICE_SEND_TEXT, data={ATTR_TEXT: command_string, ATTR_ENTITY_ID: target_entity_id}
+                )
+            )
 
     # Register the wrapper service under the 'remote' domain
     # This makes the integration natively compatible with the remote card's default keyboard action
     hass.services.async_register(
         REMOTE_DOMAIN, "send_command", async_send_command_wrapper_service
     )
+
+    # --- webOS Compatibility Wrappers ---
+
+    async def async_webostv_button_wrapper(call: ServiceCall):
+        """Handles webostv.button and wraps it to remote.send_command."""
+        button_pressed = call.data.get("button")
+        target_entity_id = call.data.get(ATTR_ENTITY_ID)
+        _LOGGER.debug("webOS button wrapper called for button: %s", button_pressed)
+        if button_pressed and target_entity_id:
+            # Translate webOS button to our KEY: format
+            command_string = f"KEY:{button_pressed.upper()}"
+            await async_send_command_wrapper_service(
+                ServiceCall(REMOTE_DOMAIN, "send_command", { "command": command_string, ATTR_ENTITY_ID: target_entity_id })
+            )
+
+    async def async_webostv_launch_wrapper(call: ServiceCall):
+        """Handles webostv.launch and wraps it to remote.send_command."""
+        app_id = call.data.get("app_id")
+        target_entity_id = call.data.get(ATTR_ENTITY_ID)
+        _LOGGER.debug("webOS launch wrapper called for app_id: %s", app_id)
+        if app_id and target_entity_id:
+            # Translate webOS app_id to our APP: format
+            # We capitalize the app name as our dispatcher might expect it
+            command_string = f"APP:{app_id.capitalize()}"
+            await async_send_command_wrapper_service(
+                ServiceCall(REMOTE_DOMAIN, "send_command", { "command": command_string, ATTR_ENTITY_ID: target_entity_id })
+            )
+
+    async def async_webostv_command_wrapper(call: ServiceCall):
+        """Handles webostv.command (for keyboard) and wraps it to remote.send_command."""
+        payload = call.data.get("payload", {})
+        text_to_send = payload.get("text")
+        target_entity_id = call.data.get(ATTR_ENTITY_ID)
+        _LOGGER.debug("webOS command wrapper called for text: %s", text_to_send)
+        if text_to_send and target_entity_id:
+            # Directly use the text for our send_text dispatcher case
+            await async_send_command_wrapper_service(
+                ServiceCall(REMOTE_DOMAIN, "send_command", { "command": text_to_send, ATTR_ENTITY_ID: target_entity_id })
+            )
+
+    # Register the webOS compatibility services if the domain is available
+    if WEBOSTV_DOMAIN:
+        _LOGGER.debug("Registering webOS compatibility services.")
+        hass.services.async_register(
+            WEBOSTV_DOMAIN, "button", async_webostv_button_wrapper
+        )
+        hass.services.async_register(
+            WEBOSTV_DOMAIN, "launch", async_webostv_launch_wrapper
+        )
+        hass.services.async_register(
+            WEBOSTV_DOMAIN, "command", async_webostv_command_wrapper
+        )
+    else:
+        _LOGGER.warning("Could not import webostv domain. Compatibility services will not be available.")
+
 
     return True
 
@@ -333,6 +413,12 @@ async def async_unload_entry(hass, entry):
     hass.services.async_remove(DOMAIN, SERVICE_SEND_TEXT)
     hass.services.async_remove(DOMAIN, SERVICE_SEND_MOUSE_EVENT)
     hass.services.async_remove(REMOTE_DOMAIN, "send_command")
+    
+    # Unregister webOS compatibility services
+    if WEBOSTV_DOMAIN:
+        hass.services.async_remove(WEBOSTV_DOMAIN, "button")
+        hass.services.async_remove(WEBOSTV_DOMAIN, "launch")
+        hass.services.async_remove(WEBOSTV_DOMAIN, "command")
 
     unload_ok = all(
         await asyncio.gather(
