@@ -82,3 +82,42 @@ hisense/remoteapp/mobile/HomeAssistant/platform_service/data/gettvinfo {
         "screen_capture_supported":     1,
         "audio_capture_version":        0
 }
+
+#######
+
+this is received from TV after opening text input dialog in browser
+
+hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"http://192.168.0.36:8000/1111"}
+
+
+####
+
+this is received while switching app (from browser to tv?)
+hisense/remoteapp/mobile/broadcast/platform_service/data/picturesetting {
+        "action":       "notify_value_changed",
+        "menu_id":      81,
+        "menu_value_type":      "int",
+        "menu_value":   1
+}
+hisense/remoteapp/mobile/broadcast/platform_service/data/picturesetting {
+        "action":       "notify_value_changed",
+        "menu_id":      19,
+        "menu_value_type":      "int",
+        "menu_value":   0
+}
+####
+
+other app change
+
+hisense/remoteapp/mobile/broadcast/platform_service/data/picturesetting {
+        "action":       "notify_value_changed",
+        "menu_id":      81,
+        "menu_value_type":      "int",
+        "menu_value":   1
+}
+hisense/remoteapp/mobile/broadcast/platform_service/data/picturesetting {
+        "action":       "notify_value_changed",
+        "menu_id":      19,
+        "menu_value_type":      "int",
+        "menu_value":   0
+}

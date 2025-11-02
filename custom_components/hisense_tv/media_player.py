@@ -174,6 +174,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._media_position_updated_at = dt_util.utcnow()
         self._pending_poll_response = False
         self._missed_polls = 0
+        self._input_text = None  # store "bwsinputdata"
 
         self._sourcelist_requested = False
 
@@ -524,6 +525,16 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             self._message_received_sourcelist,
         )
 
+        # subscribe topic for "bwsinputdata" to get current text field content
+        self._subscriptions["inputdata"] = await mqtt.async_subscribe(
+            self._hass,
+            self._in_topic(
+                "/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata"
+            ),
+            self._message_received_inputdata,
+        )
+
+
     async def _message_received_turnoff(self, msg):
         """Run when new MQTT message has been received."""
         self._pending_poll_response = False
@@ -649,6 +660,20 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             # For retained, just update attributes/UI, but not the state
             self.async_write_ha_state()
 
+    async def _message_received_inputdata(self, msg):
+        """received broadcast message 'bwsinputdata'."""
+        _LOGGER.debug("Received inputdata broadcast: %s", msg.payload)
+        try:
+            payload = json.loads(msg.payload)
+            # Update the input text if the status indicates an open keyboard (vkbstatus:1)
+            if payload.get("vkbstatus") == 1:
+                self._input_text = payload.get("inputdata")
+            else:
+                # Clear the text if the keyboard is closed
+                self._input_text = None
+            self.async_write_ha_state()
+        except (JSONDecodeError, AttributeError):
+            _LOGGER.warning("error parsing 'bwsinputdata' broadcast: %s", msg.payload)
     async def _build_library_node(self):
         node = BrowseMedia(
             title="Media Library",
@@ -997,4 +1022,11 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             topic=self._out_topic("/remoteapp/tv/platform_service/%s/actions/getvolume"),
             payload="",
             retain=False
+        )
+
+    @property
+    def extra_state_attributes(self):
+        """Return the state attributes."""
+        attributes = {"input_text": self._input_text}
+        return attributes
         )
