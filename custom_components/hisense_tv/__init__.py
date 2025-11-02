@@ -312,7 +312,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             key = command_string.split(":", 1)[1]
             _LOGGER.debug("Dispatching to send_key with key: %s", key)
             await async_send_key_service(
-                ServiceCall(domain=DOMAIN, service=SERVICE_SEND_KEY, data={ATTR_KEY: key, ATTR_ENTITY_ID: target_entity_id})
+                ServiceCall(hass, domain=DOMAIN, service=SERVICE_SEND_KEY, data={ATTR_KEY: key, ATTR_ENTITY_ID: target_entity_id})
             )
         elif command_string.startswith("APP:"):
             app_name = command_string.split(":", 1)[1]
@@ -328,7 +328,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             _LOGGER.debug("Dispatching to send_text with text: %s", command_string)
             await async_send_text_service(
                 ServiceCall(
-                    domain=DOMAIN, service=SERVICE_SEND_TEXT, data={ATTR_TEXT: command_string, ATTR_ENTITY_ID: target_entity_id}
+                    hass, domain=DOMAIN, service=SERVICE_SEND_TEXT, data={ATTR_TEXT: command_string, ATTR_ENTITY_ID: target_entity_id}
                 )
             )
 
