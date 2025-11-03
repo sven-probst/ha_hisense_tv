@@ -238,12 +238,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             
             # Send new characters
             for char in text_to_send:
-                # Handle special character for backspace
-                if char == '\b':
-                    payload = "Lit_BACKSPACE"
-                    await mqtt.async_publish(hass=hass, topic=formatted_topic, payload=payload, retain=False)
-                    await asyncio.sleep(key_delay)
-                    continue
                 # Handle special characters like ENTER
                 if char == '\n':
                     payload = "Lit_ENTER"
@@ -356,6 +350,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     # --- webOS Compatibility Wrappers ---
 
+    # Dictionary to store the last text sent via the webOS wrapper for each entity
+    last_webostv_text = {}
+
     async def async_webostv_button_wrapper(call: ServiceCall):
         """Handles webostv.button and wraps it to remote.send_command."""
         button_pressed = call.data.get("button")
@@ -413,9 +410,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         # Case 1: Handle text input from keyboard (payload has 'text')
         if text_to_send is not None:
             _LOGGER.debug("webOS command wrapper (keyboard) called for text: %s", text_to_send)
-            await async_send_command_wrapper_service(
-                ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": text_to_send, ATTR_ENTITY_ID: target_entity_id})
+            
+            old_text = last_webostv_text.get(target_entity_id, "")
+
+            # Calculate the difference to send only new characters or backspaces
+            common_prefix_len = 0
+            while common_prefix_len < len(old_text) and common_prefix_len < len(text_to_send) and old_text[common_prefix_len] == text_to_send[common_prefix_len]:
+                common_prefix_len += 1
+            
+            backspaces_needed = len(old_text) - common_prefix_len
+            text_to_append = text_to_send[common_prefix_len:]
+
+            # Combine backspaces and new text
+            final_text_to_send = ("\b" * backspaces_needed) + text_to_append
+
+            await async_send_text_service(
+                ServiceCall(hass, domain=DOMAIN, service=SERVICE_SEND_TEXT, data={ATTR_TEXT: final_text_to_send, ATTR_ENTITY_ID: target_entity_id})
             )
+
+            # Update the last sent text for the entity
+            last_webostv_text[target_entity_id] = text_to_send
             return
         
         # Case 2: Handle pre-filling of the text input field
@@ -440,6 +454,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             hisense_key = command_map.get(command)
             if hisense_key:
                 if hisense_key == "LIT_ENTER_SPECIAL":
+                    # Clear the text history on enter
+                    last_webostv_text.pop(target_entity_id, None)
                     _LOGGER.debug("webOS command wrapper sending Lit_ENTER for sendEnterKey")
                     await async_send_text_service(ServiceCall(hass, domain=DOMAIN, service=SERVICE_SEND_TEXT, data={ATTR_TEXT: "\n", ATTR_ENTITY_ID: target_entity_id}))
                     return
@@ -447,6 +463,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 await async_send_command_wrapper_service(
                     ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": f"KEY:{hisense_key}", ATTR_ENTITY_ID: target_entity_id})
                 )
+                # If a backspace was sent, update our text history
+                if hisense_key == "BACKSPACE":
+                    old_text = last_webostv_text.get(target_entity_id, "")
+                    last_webostv_text[target_entity_id] = old_text[:-1]
 
     # Register the webOS compatibility services if the domain is available
     if WEBOSTV_DOMAIN:
@@ -490,6 +510,10 @@ async def async_unload_entry(hass, entry):
         hass.services.async_remove(WEBOSTV_DOMAIN, "button")
         hass.services.async_remove(WEBOSTV_DOMAIN, "launch")
         hass.services.async_remove(WEBOSTV_DOMAIN, "command")
+    
+    # Clear the text history
+    if "last_webostv_text" in globals():
+        globals()["last_webostv_text"].clear()
 
     unload_ok = all(
         await asyncio.gather(
