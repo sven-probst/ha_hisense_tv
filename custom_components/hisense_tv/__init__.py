@@ -427,6 +427,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             await async_send_command_wrapper_service(
                 ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": text_to_send, ATTR_ENTITY_ID: target_entity_id})
             )
+            # After sending text, also send an ENTER key press to submit the input
+            _LOGGER.debug("webOS command wrapper also sending ENTER key after text")
+            await async_send_command_wrapper_service(
+                ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": "KEY:ENTER", ATTR_ENTITY_ID: target_entity_id})
+            )
             return
         
         # Case 2: Handle pre-filling of the text input field
