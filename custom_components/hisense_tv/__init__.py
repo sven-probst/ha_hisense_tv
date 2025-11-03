@@ -410,54 +410,46 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     async def async_webostv_command_wrapper(call: ServiceCall):
         """Handles webostv.command (for keyboard) and wraps it to remote.send_command."""
+        _LOGGER.debug("webOS command wrapper called with data: %s", call.data)
         target_entity_id = call.data.get(ATTR_ENTITY_ID)
         if not target_entity_id:
             return
 
-        # Case 1: Handle keyboard input (payload with text)
+        command = call.data.get("command")
         payload = call.data.get("payload", {})
         text_to_send = payload.get("text")
+
+        # Case 1: Handle text input from keyboard (payload has 'text')
         if text_to_send is not None:
             _LOGGER.debug("webOS command wrapper (keyboard) called for text: %s", text_to_send)
             await async_send_command_wrapper_service(
                 ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": text_to_send, ATTR_ENTITY_ID: target_entity_id})
             )
             return
+        
+        # Case 2: Handle pre-filling of the text input field
+        elif command == "system.launcher/getForegroundAppInfo":
+            _LOGGER.debug("webOS command wrapper (pre-fill) called for getForegroundAppInfo")
+            media_player_entity = hass.data["media_player"].get_entity(target_entity_id)
+            if media_player_entity and hasattr(media_player_entity, '_input_text'):
+                # The remote-card looks for a 'text' key in the response payload.
+                hass.bus.async_fire(f"webostv_response_{target_entity_id.replace('.', '_')}", {"payload": {"text": media_player_entity._input_text}})
+            return
 
-        # Case 2: Handle generic commands (like media controls)
-        command = call.data.get("command")
-        if command:
+        # Case 3: Handle generic commands (like media controls)
+        elif command:
             _LOGGER.debug("webOS command wrapper (generic) called for command: %s", command)
             command_map = {
-                # Media Controls
-                "media.controls/stop": "STOP",
-                "media.controls/play": "PLAY",
-                "media.controls/pause": "PAUSE",
-                "media.controls/rewind": "BACK",        # Hisense 'BACK' is rewind
-                "media.controls/fastForward": "FORWARDS", # Hisense 'FORWARDS' is fast-forward
-                # IME (Input Method Editor) Controls
-                "com.webos.service.ime/deleteCharacters": "BACKSPACE",
-                "com.webos.service.ime/sendEnterKey": "OK",
+                "media.controls/stop": "STOP", "media.controls/play": "PLAY", "media.controls/pause": "PAUSE",
+                "media.controls/rewind": "BACK", "media.controls/fastForward": "FORWARDS",
+                "com.webos.service.ime/deleteCharacters": "BACKSPACE", "com.webos.service.ime/sendEnterKey": "OK",
             }
             hisense_key = command_map.get(command)
             if hisense_key:
                 _LOGGER.debug("Mapped webOS command '%s' to Hisense key '%s'", command, hisense_key)
                 await async_send_command_wrapper_service(
                     ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": f"KEY:{hisense_key}", ATTR_ENTITY_ID: target_entity_id})
-            )
-
-    # This wrapper is specifically for remote-card's text input pre-filling.
-    # It responds to a 'system.launcher/getForegroundAppInfo' command by returning the current input_text.
-    async def async_webostv_foreground_app_wrapper(call: ServiceCall):
-        """Handles webostv.command for getForegroundAppInfo to provide input text."""
-        target_entity_id = call.data.get(ATTR_ENTITY_ID)
-        command = call.data.get("command")
-
-        if command == "system.launcher/getForegroundAppInfo" and target_entity_id:
-            media_player_entity = hass.data["media_player"].get_entity(target_entity_id)
-            if media_player_entity and hasattr(media_player_entity, '_input_text'):
-                # The remote-card looks for a 'text' key in the response payload.
-                hass.bus.async_fire(f"webostv_response_{target_entity_id.replace('.', '_')}", {"payload": {"text": media_player_entity._input_text}})
+                )
 
     # Register the webOS compatibility services if the domain is available
     if WEBOSTV_DOMAIN:
@@ -470,10 +462,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         )
         hass.services.async_register(
             WEBOSTV_DOMAIN, "command", async_webostv_command_wrapper
-        )
-        # This uses the same service name but is handled by a different function.
-        hass.services.async_register(
-            WEBOSTV_DOMAIN, "command", async_webostv_foreground_app_wrapper
         )
     else:
         _LOGGER.warning("Could not import webostv domain. Compatibility services will not be available.")
@@ -505,7 +493,6 @@ async def async_unload_entry(hass, entry):
         hass.services.async_remove(WEBOSTV_DOMAIN, "button")
         hass.services.async_remove(WEBOSTV_DOMAIN, "launch")
         hass.services.async_remove(WEBOSTV_DOMAIN, "command")
-        hass.services.async_remove(WEBOSTV_DOMAIN, "command") # Remove the second one too
 
     unload_ok = all(
         await asyncio.gather(
