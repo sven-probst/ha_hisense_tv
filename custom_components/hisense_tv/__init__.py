@@ -238,12 +238,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             
             # Send new characters
             for char in text_to_send:
-                # Handle special characters like ENTER
+                # Handle special character for backspace
+                if char == '\b':
+                    payload = "Lit_BACKSPACE"
+                    await mqtt.async_publish(hass=hass, topic=formatted_topic, payload=payload, retain=False)
+                    await asyncio.sleep(key_delay)
+                    continue
+                # Handle special character for ENTER
                 if char == '\n':
                     payload = "Lit_ENTER"
                     await mqtt.async_publish(hass=hass, topic=formatted_topic, payload=payload, retain=False)
                     await asyncio.sleep(key_delay)
                     continue
+                
                 payload = f"Lit_{char}" if char != ' ' else "Lit_SPACE"
                 _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
                 await mqtt.async_publish(
