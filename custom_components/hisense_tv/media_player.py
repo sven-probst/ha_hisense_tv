@@ -457,28 +457,21 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         """Select input source."""
         _LOGGER.debug("async_select_source %s", source)
 
-        if source == "App":
+        source_dic = self._source_list.get(source)
+        if source_dic and source_dic.get("sourceid") is not None:
+            # This is a standard source like HDMI, TV, etc.
+            payload = json.dumps(
+                {"sourceid": source_dic.get("sourceid"), "sourcename": source_dic.get("sourcename")}
+            )
             await mqtt.async_publish(
                 hass=self._hass,
-                topic=self._out_topic(
-                    "/remoteapp/tv/remote_service/%s/actions/sendkey"
-                ),
-                payload="KEY_HOME",
+                topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/changesource"),
+                payload=payload,
             )
-            return
-
-        source_dic = self._source_list.get(source)
-        payload = json.dumps(
-            {
-                "sourceid": source_dic.get("sourceid"),
-                "sourcename": source_dic.get("sourcename"),
-            }
-        )
-        await mqtt.async_publish(
-            hass=self._hass,
-            topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/changesource"),
-            payload=payload,
-        )
+        else:
+            # This is likely an app name, so try to launch it.
+            _LOGGER.debug("Source '%s' not in standard source list, attempting to launch as app.", source)
+            await self.async_launch_app(source)
 
     async def async_will_remove_from_hass(self):
         for unsubscribe in list(self._subscriptions.values()):
