@@ -446,6 +446,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": f"KEY:{hisense_key}", ATTR_ENTITY_ID: target_entity_id})
             )
 
+    # This wrapper is specifically for remote-card's text input pre-filling.
+    # It responds to a 'system.launcher/getForegroundAppInfo' command by returning the current input_text.
+    async def async_webostv_foreground_app_wrapper(call: ServiceCall):
+        """Handles webostv.command for getForegroundAppInfo to provide input text."""
+        target_entity_id = call.data.get(ATTR_ENTITY_ID)
+        command = call.data.get("command")
+
+        if command == "system.launcher/getForegroundAppInfo" and target_entity_id:
+            media_player_entity = hass.data["media_player"].get_entity(target_entity_id)
+            if media_player_entity and hasattr(media_player_entity, '_input_text'):
+                # The remote-card looks for a 'text' key in the response payload.
+                hass.bus.async_fire(f"webostv_response_{target_entity_id.replace('.', '_')}", {"payload": {"text": media_player_entity._input_text}})
+
     # Register the webOS compatibility services if the domain is available
     if WEBOSTV_DOMAIN:
         _LOGGER.debug("Registering webOS compatibility services.")
@@ -457,6 +470,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         )
         hass.services.async_register(
             WEBOSTV_DOMAIN, "command", async_webostv_command_wrapper
+        )
+        # This uses the same service name but is handled by a different function.
+        hass.services.async_register(
+            WEBOSTV_DOMAIN, "command", async_webostv_foreground_app_wrapper
         )
     else:
         _LOGGER.warning("Could not import webostv domain. Compatibility services will not be available.")
@@ -488,6 +505,7 @@ async def async_unload_entry(hass, entry):
         hass.services.async_remove(WEBOSTV_DOMAIN, "button")
         hass.services.async_remove(WEBOSTV_DOMAIN, "launch")
         hass.services.async_remove(WEBOSTV_DOMAIN, "command")
+        hass.services.async_remove(WEBOSTV_DOMAIN, "command") # Remove the second one too
 
     unload_ok = all(
         await asyncio.gather(
