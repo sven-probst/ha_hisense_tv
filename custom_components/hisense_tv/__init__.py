@@ -411,7 +411,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         if text_to_send is not None:
             _LOGGER.debug("webOS command wrapper (keyboard) called for text: %s", text_to_send)
             
-            old_text = last_webostv_text.get(target_entity_id, "")
+            # If our history is empty, it's the first keypress.
+            # Initialize our history with the actual current text from the TV.
+            if target_entity_id not in last_webostv_text:
+                media_player_entity = hass.data["media_player"].get_entity(target_entity_id)
+                initial_text = getattr(media_player_entity, '_input_text', None) or ""
+                last_webostv_text[target_entity_id] = initial_text
+            old_text = last_webostv_text.get(target_entity_id)
 
             # Calculate the difference to send only new characters or backspaces
             common_prefix_len = 0
