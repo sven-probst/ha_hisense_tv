@@ -410,12 +410,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             await async_send_command_wrapper_service(
                 ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": text_to_send, ATTR_ENTITY_ID: target_entity_id})
             )
-            # After sending text, also send a Lit_ENTER to submit the input.
-            # We use the send_text service with a special character for this.
-            _LOGGER.debug("webOS command wrapper also sending Lit_ENTER after text")
-            await async_send_text_service(
-                ServiceCall(hass, domain=DOMAIN, service=SERVICE_SEND_TEXT, data={ATTR_TEXT: "\n", ATTR_ENTITY_ID: target_entity_id})
-            )
             return
         
         # Case 2: Handle pre-filling of the text input field
@@ -433,10 +427,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             command_map = {
                 "media.controls/stop": "STOP", "media.controls/play": "PLAY", "media.controls/pause": "PAUSE",
                 "media.controls/rewind": "BACK", "media.controls/fastForward": "FORWARDS",
-                "com.webos.service.ime/deleteCharacters": "BACKSPACE", "com.webos.service.ime/sendEnterKey": "ENTER",
+                "com.webos.service.ime/deleteCharacters": "BACKSPACE", 
+                # Explicitly handle sendEnterKey to send Lit_ENTER, not KEY_ENTER
+                "com.webos.service.ime/sendEnterKey": "LIT_ENTER_SPECIAL",
             }
             hisense_key = command_map.get(command)
             if hisense_key:
+                if hisense_key == "LIT_ENTER_SPECIAL":
+                    _LOGGER.debug("webOS command wrapper sending Lit_ENTER for sendEnterKey")
+                    await async_send_text_service(ServiceCall(hass, domain=DOMAIN, service=SERVICE_SEND_TEXT, data={ATTR_TEXT: "\n", ATTR_ENTITY_ID: target_entity_id}))
+                    return
                 _LOGGER.debug("Mapped webOS command '%s' to Hisense key '%s'", command, hisense_key)
                 await async_send_command_wrapper_service(
                     ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": f"KEY:{hisense_key}", ATTR_ENTITY_ID: target_entity_id})
