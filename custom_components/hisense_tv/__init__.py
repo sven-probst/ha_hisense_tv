@@ -213,28 +213,46 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         DOMAIN, SERVICE_LAUNCH_APP, async_launch_app_service, schema=LAUNCH_APP_SCHEMA
     )
 
+    # Dictionary to store the last sent text for each entity
+    last_sent_text = {}
+
     async def async_send_text_service(call: ServiceCall):
         """Handles the send_text service call."""
         _LOGGER.debug("Service hisense_tv.send_text called with data: %s", call.data)
-        
-        text_to_send = call.data[ATTR_TEXT]
+
+        new_text = call.data[ATTR_TEXT]
         entity_ids = await async_extract_entity_ids(call)
 
         for target_entity_id in entity_ids:
+            old_text = last_sent_text.get(target_entity_id, "")
+
+            # Calculate the difference
+            # Find the common prefix
+            common_prefix_len = 0
+            while common_prefix_len < len(old_text) and common_prefix_len < len(new_text) and old_text[common_prefix_len] == new_text[common_prefix_len]:
+                common_prefix_len += 1
+
+            backspaces_needed = len(old_text) - common_prefix_len
+            text_to_append = new_text[common_prefix_len:]
+
+            _LOGGER.debug("Sending text diff: backspaces=%d, append='%s'", backspaces_needed, text_to_append)
+
             mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
             if not mqtt_out_prefix:
                 continue
 
             client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
             formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/input"
+            
+            # Send backspaces
+            for _ in range(backspaces_needed):
+                payload = "Lit_BACKSPACE"
+                await mqtt.async_publish(hass=hass, topic=formatted_topic, payload=payload, retain=False)
+                await asyncio.sleep(0.1)
 
-            for char in text_to_send: # pragma: no cover
-                if char == ' ':
-                    payload = "Lit_SPACE"
-                elif char == '\b':
-                    payload = "Lit_BACKSPACE"
-                else:
-                    payload = f"Lit_{char}"
+            # Send new characters
+            for char in text_to_append:
+                payload = f"Lit_{char}" if char != ' ' else "Lit_SPACE"
                 _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
                 await mqtt.async_publish(
                     hass=hass,
@@ -243,6 +261,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     retain=False,
                 )
                 await asyncio.sleep(0.1)
+
+            # Update the last sent text for the entity
+            last_sent_text[target_entity_id] = new_text
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_TEXT, async_send_text_service, schema=SEND_TEXT_SCHEMA
