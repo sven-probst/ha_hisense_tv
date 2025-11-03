@@ -270,17 +270,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
             # Update the last sent text for the entity
             last_sent_text[target_entity_id] = new_text
-            
-            # After sending the text, also send an "Enter" key press to confirm the input
-            _LOGGER.debug("Sending KEY_ENTER to confirm text input for entity: %s", target_entity_id)
-            key_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
-            await mqtt.async_publish(
-                hass=hass,
-                topic=key_topic,
-                payload="KEY_ENTER",
-                retain=False,
-            )
-            await asyncio.sleep(key_delay)
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_TEXT, async_send_text_service, schema=SEND_TEXT_SCHEMA
@@ -455,7 +444,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             command_map = {
                 "media.controls/stop": "STOP", "media.controls/play": "PLAY", "media.controls/pause": "PAUSE",
                 "media.controls/rewind": "BACK", "media.controls/fastForward": "FORWARDS",
-                "com.webos.service.ime/deleteCharacters": "BACKSPACE", "com.webos.service.ime/sendEnterKey": "OK",
+                "com.webos.service.ime/deleteCharacters": "BACKSPACE", "com.webos.service.ime/sendEnterKey": "ENTER",
             }
             hisense_key = command_map.get(command)
             if hisense_key:
