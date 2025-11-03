@@ -258,6 +258,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
             # Send new characters
             for char in text_to_append:
+                # Handle special characters like ENTER
+                if char == '\n':
+                    payload = "Lit_ENTER"
+                    await mqtt.async_publish(hass=hass, topic=formatted_topic, payload=payload, retain=False)
+                    await asyncio.sleep(key_delay)
+                    continue
                 payload = f"Lit_{char}" if char != ' ' else "Lit_SPACE"
                 _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
                 await mqtt.async_publish(
@@ -427,10 +433,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             await async_send_command_wrapper_service(
                 ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": text_to_send, ATTR_ENTITY_ID: target_entity_id})
             )
-            # After sending text, also send an ENTER key press to submit the input
-            _LOGGER.debug("webOS command wrapper also sending ENTER key after text")
-            await async_send_command_wrapper_service(
-                ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": "KEY:ENTER", ATTR_ENTITY_ID: target_entity_id})
+            # After sending text, also send a Lit_ENTER to submit the input.
+            # We use the send_text service with a special character for this.
+            _LOGGER.debug("webOS command wrapper also sending Lit_ENTER after text")
+            await async_send_text_service(
+                ServiceCall(hass, domain=DOMAIN, service=SERVICE_SEND_TEXT, data={ATTR_TEXT: "\n", ATTR_ENTITY_ID: target_entity_id})
             )
             return
         
