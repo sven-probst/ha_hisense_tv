@@ -39,7 +39,6 @@ from homeassistant.helpers import config_validation as cv, device_registry as dr
 from .const import (
     ATTR_CODE,
     CONF_MQTT_IN,
-    CONF_ENABLE_POLLING,
     CONF_MQTT_OUT,
     DEFAULT_NAME,
     DOMAIN,
@@ -104,7 +103,6 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     mqtt_in = config_entry.data[CONF_MQTT_IN]
     mqtt_out = config_entry.data[CONF_MQTT_OUT]
     uid = config_entry.unique_id
-    enable_polling = True
     if uid is None:
         uid = config_entry.entry_id
 
@@ -115,8 +113,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         mqtt_out=mqtt_out,
         mac=mac,
         uid=uid,
-        ip_address=ip_address,
-        enable_polling=enable_polling,
+        ip_address=ip_address
     )
     async_add_entities([entity])
 
@@ -145,7 +142,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         )
         # Set a specific name to avoid conflicts with other integrations like DLNA.
         # This results in a clean entity_id like 'media_player.living_room_tv_control'.
-        self._attr_name = f"{name} Control" 
+        self._attr_name = f"{name} Control"
 
         self._muted = False
         self._attr_unique_id = uid

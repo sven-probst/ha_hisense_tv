@@ -8,8 +8,7 @@
                     "mac": "[%key:common::config_flow::data::mac%]",
                     "ip_address": "[%key:common::config_flow::data::ip_address%]",
                     "mqtt_in": "[%key:common::config_flow::data::mqtt_in%]",
-                    "mqtt_out": "[%key:common::config_flow::data::mqtt_out%]",
-                    "enable_polling": "[%key:component::hisense_tv::config::step::user::data::enable_polling%]"
+                    "mqtt_out": "[%key:common::config_flow::data::mqtt_out%]"
                 }
             },
             "auth": {
@@ -25,8 +24,7 @@
                     "data": {
                         "ip_address": "[%key:common::config_flow::data::ip_address%]",
                         "mqtt_in": "[%key:component::hisense_tv::options::step::init::data::mqtt_in%]",
-                        "mqtt_out": "[%key:component::hisense_tv::options::step::init::data::mqtt_out%]",
-                        "enable_polling": "[%key:component::hisense_tv::config::step::user::data::enable_polling%]"
+                        "mqtt_out": "[%key:component::hisense_tv::options::step::init::data::mqtt_out%]"
                     },
                     "description": "[%key:component::hisense_tv::options::step::init::description%]"
                 }
