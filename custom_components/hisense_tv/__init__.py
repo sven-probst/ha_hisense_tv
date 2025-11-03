@@ -33,6 +33,8 @@ from .const import (
     ATTR_DY,
     SSDP_ST,
     CONF_MQTT_OUT,
+    CONF_KEY_DELAY,
+    DEFAULT_KEY_DELAY,
     DEFAULT_CLIENT_ID,
     )
 
@@ -131,6 +133,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 continue
 
             client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
+            key_delay = target_config_entry.options.get(CONF_KEY_DELAY, target_config_entry.data.get(CONF_KEY_DELAY, DEFAULT_KEY_DELAY))
             formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
 
             keys = keys_to_send
@@ -146,7 +149,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     payload=payload,
                     retain=False,
                 )
-                await asyncio.sleep(0.5) # A small delay between keys can improve reliability
+                await asyncio.sleep(key_delay) # A small delay between keys can improve reliability
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_KEY, async_send_key_service, schema=SEND_KEY_SCHEMA
@@ -165,6 +168,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 continue
 
             client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
+            key_delay = target_config_entry.options.get(CONF_KEY_DELAY, target_config_entry.data.get(CONF_KEY_DELAY, DEFAULT_KEY_DELAY))
             # Use the same sendkey topic, as each digit is a key
             formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
 
@@ -175,7 +179,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 payload="KEY_EXIT",
                 retain=False,
             )
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(key_delay)
 
             for digit in channel_number:
                 key_payload = f"KEY_{digit}"
@@ -186,7 +190,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     payload=key_payload,
                     retain=False,
                 )
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(key_delay)
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_CHANNEL, async_send_channel_service, schema=SEND_CHANNEL_SCHEMA

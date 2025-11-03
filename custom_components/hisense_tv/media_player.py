@@ -104,7 +104,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     mqtt_in = config_entry.data[CONF_MQTT_IN]
     mqtt_out = config_entry.data[CONF_MQTT_OUT]
     uid = config_entry.unique_id
-    enable_polling = config_entry.options.get(CONF_ENABLE_POLLING, config_entry.data.get(CONF_ENABLE_POLLING, False))
+    enable_polling = True
     if uid is None:
         uid = config_entry.entry_id
 
@@ -132,8 +132,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         mqtt_out: str,
         mac: str,
         uid: str,
-        ip_address: str,
-        enable_polling: bool,
+        ip_address: str
     ):
         super().__init__(
             hass=hass,
@@ -146,16 +145,14 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         )
         # Set a specific name to avoid conflicts with other integrations like DLNA.
         # This results in a clean entity_id like 'media_player.living_room_tv_control'.
-        self._attr_name = f"{name} Control"
-        self._enable_polling = enable_polling
+        self._attr_name = f"{name} Control" 
 
         self._muted = False
         self._attr_unique_id = uid
         self._volume = 0
         self._state = STATE_OFF
         # Request sourcelist on init if TV is already on 
-        if enable_polling:
-            self._hass.async_create_task(self._check_tv_state())
+        self._hass.async_create_task(self._check_tv_state())
 
         self._source_name = None
         self._source_id = None
@@ -181,7 +178,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
     @property
     def should_poll(self):
         """Poll for non media_player updates."""
-        return self._enable_polling
+        return True
 
     @property
     def media_content_type(self):
@@ -220,10 +217,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def async_update(self):
         """Get the latest data and updates the states."""
-        if not self._enable_polling:
-            _LOGGER.debug("async_update called, but polling is disabled for this entity.")
-            return
-
         # Standard polling interval check
         if (
             not self._force_trigger

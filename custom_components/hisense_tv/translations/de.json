@@ -8,8 +8,8 @@
                     "mac": "WakeOnLAN MAC-Adresse",
                     "ip_address": "WakeOnLAN IP-Adresse",
                     "mqtt_in": "MQTT Subscription-Präfix",
-                    "mqtt_out": "MQTT Publish-Präfix",
-                    "enable_polling": "Aktiviere Polling für Status-Updates"
+                    "mqtt_out": "MQTT Publish-Präfix", 
+                    "key_delay": "Verzögerung zwischen Tastendrücken (in Sekunden)"
                 }
             },
             "authentication": {
@@ -37,7 +37,8 @@
                 "title": "Hisense TV Optionen",
                 "data": {
                     "mqtt_in": "MQTT Subscription-Präfix",
-                    "mqtt_out": "MQTT Publish-Präfix"
+                    "mqtt_out": "MQTT Publish-Präfix",
+                    "key_delay": "Verzögerung zwischen Tastendrücken (in Sekunden)"
                 },
                 "description": "Passe die Einstellungen für deinen Hisense TV an. Änderungen führen zu einem Neustart der Integration."
             }

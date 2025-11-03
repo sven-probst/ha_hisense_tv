@@ -19,13 +19,14 @@ from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
 
 from .const import (
-    CONF_ENABLE_POLLING,
     CONF_MQTT_IN,
+    CONF_KEY_DELAY,
     CONF_MQTT_OUT,
     DEFAULT_CLIENT_ID,
     DEFAULT_MQTT_PREFIX,
     DEFAULT_NAME,
     DOMAIN,
+    DEFAULT_KEY_DELAY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -156,7 +157,7 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_IP_ADDRESS, default=self._discovered_ip or ""): str,
                 vol.Optional(CONF_MQTT_IN, default=DEFAULT_MQTT_PREFIX): str,
                 vol.Optional(CONF_MQTT_OUT, default=DEFAULT_MQTT_PREFIX): str,
-                vol.Optional(CONF_ENABLE_POLLING, default=False): bool,
+                vol.Optional(CONF_KEY_DELAY, default=DEFAULT_KEY_DELAY): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=2.0)),
             }
         )
 
@@ -313,9 +314,9 @@ class HisenseTvOptionsFlow(config_entries.OptionsFlow):
                     description={"suggested_value": self.config_entry.data.get(CONF_MQTT_OUT)},
                 ): str,
                 vol.Optional(
-                    CONF_ENABLE_POLLING,
-                    default=self.config_entry.options.get(CONF_ENABLE_POLLING, self.config_entry.data.get(CONF_ENABLE_POLLING, False)),
-                ): bool,
+                    CONF_KEY_DELAY,
+                    default=self.config_entry.options.get(CONF_KEY_DELAY, self.config_entry.data.get(CONF_KEY_DELAY, DEFAULT_KEY_DELAY)),
+                ): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=2.0)),
             }
         )
 
