@@ -121,3 +121,31 @@ hisense/remoteapp/mobile/broadcast/platform_service/data/picturesetting {
         "menu_value_type":      "int",
         "menu_value":   0
 }
+#######
+
+enter text in textfield
+
+hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_a
+hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"a"}
+hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
+hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_b
+hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"ab"}
+hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
+hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_c
+hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"abc"}
+hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
+hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_d
+hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"abcd"}
+hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
+hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_e
+hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"abcde"}
+hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
+hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_f
+hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"abcdef"}
+hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
+hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_BACKSPACE
+hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"abcde"}
+hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
+hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_ENTER
+hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":0,"inputdata":""}
+hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 0

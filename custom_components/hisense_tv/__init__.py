@@ -235,13 +235,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             common_prefix_len = 0
             while common_prefix_len < len(old_text) and common_prefix_len < len(new_text) and old_text[common_prefix_len] == new_text[common_prefix_len]:
                 common_prefix_len += 1
-
+            
             backspaces_needed = len(old_text) - common_prefix_len
             text_to_append = new_text[common_prefix_len:]
 
             _LOGGER.debug("Sending text diff: backspaces=%d, append='%s'", backspaces_needed, text_to_append)
 
             mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
+            # Use a shorter, fixed delay for text input as it's more sensitive
+            key_delay = 0.1
             if not mqtt_out_prefix:
                 continue
 
@@ -252,7 +254,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             for _ in range(backspaces_needed):
                 payload = "Lit_BACKSPACE"
                 await mqtt.async_publish(hass=hass, topic=formatted_topic, payload=payload, retain=False)
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(key_delay)
 
             # Send new characters
             for char in text_to_append:
@@ -264,10 +266,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     payload=payload,
                     retain=False,
                 )
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(key_delay)
 
             # Update the last sent text for the entity
             last_sent_text[target_entity_id] = new_text
+            
+            # After sending the text, also send an "Enter" key press to confirm the input
+            _LOGGER.debug("Sending KEY_ENTER to confirm text input for entity: %s", target_entity_id)
+            key_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
+            await mqtt.async_publish(
+                hass=hass,
+                topic=key_topic,
+                payload="KEY_ENTER",
+                retain=False,
+            )
+            await asyncio.sleep(key_delay)
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_TEXT, async_send_text_service, schema=SEND_TEXT_SCHEMA
