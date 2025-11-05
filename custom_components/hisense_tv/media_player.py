@@ -21,10 +21,8 @@ from homeassistant.components.media_player import (
     MediaType,
     MediaClass
 )
-from homeassistant.components.media_player.const import (
-    MediaPlayerState,
-)
 from homeassistant.config_entries import SOURCE_IMPORT
+from homeassistant.helpers.debounce import Debouncer
 from homeassistant.const import (
     CONF_IP_ADDRESS,
     CONF_MAC,
@@ -42,6 +40,7 @@ from .const import (
     CONF_MQTT_OUT,
     DEFAULT_NAME,
     DOMAIN,
+    KEY_DELAY,
 )
 from .helper import HisenseTvBase, mqtt_pub_sub
 
@@ -103,6 +102,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     mqtt_in = config_entry.data[CONF_MQTT_IN]
     mqtt_out = config_entry.data[CONF_MQTT_OUT]
     uid = config_entry.unique_id
+    key_delay = config_entry.options.get(KEY_DELAY, 0.2)
     if uid is None:
         uid = config_entry.entry_id
 
@@ -113,7 +113,8 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         mqtt_out=mqtt_out,
         mac=mac,
         uid=uid,
-        ip_address=ip_address
+        ip_address=ip_address,
+        key_delay=key_delay,
     )
     async_add_entities([entity])
 
@@ -129,7 +130,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         mqtt_out: str,
         mac: str,
         uid: str,
-        ip_address: str
+        ip_address: str,
+        key_delay: float,
     ):
         super().__init__(
             hass=hass,
@@ -169,6 +171,12 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._pending_poll_response = False
         self._missed_polls = 0
         self._input_text = None  # store "bwsinputdata"
+
+        # Mouse event throttling
+        self._mouse_dx_total = 0
+        self._mouse_dy_total = 0
+        self._mouse_throttle_timer = None
+        self._mouse_throttle_interval = 0.1  # Send updates every 100ms
 
         self._sourcelist_requested = False
 
@@ -1015,3 +1023,40 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         # Add our custom attribute
         attributes["input_text"] = self._input_text
         return attributes
+
+    async def async_send_mouse_event(self, dx: int, dy: int):
+        """Accumulate and throttle mouse movement events."""
+        self._mouse_dx_total += dx
+        self._mouse_dy_total += dy
+
+        if not self._mouse_throttle_timer:
+            self._mouse_throttle_timer = self.hass.async_create_timer(
+                self._mouse_throttle_interval, self._async_send_throttled_mouse_event
+            )
+
+    async def _async_send_throttled_mouse_event(self, _=None):
+        """Send the accumulated mouse movement event to the Hisense TV."""
+        if self._mouse_dx_total == 0 and self._mouse_dy_total == 0:
+            self._mouse_throttle_timer = None
+            return
+
+        dx_to_send = self._mouse_dx_total
+        dy_to_send = self._mouse_dy_total
+
+        # Reset accumulators
+        self._mouse_dx_total = 0
+        self._mouse_dy_total = 0
+
+        _LOGGER.debug("Sending throttled mouse event: dx=%d, dy=%d", dx_to_send, dy_to_send)
+        payload = json.dumps({"dx": dx_to_send, "dy": dy_to_send})
+        await mqtt.async_publish(
+            hass=self._hass,
+            topic=self._out_topic(
+                "/remoteapp/tv/remote_service/%s$vidaa_common/actions/mousemove"
+            ),
+            payload=payload,
+            retain=False,
+        )
+
+        # Reset the timer so the next movement will start a new one
+        self._mouse_throttle_timer = None
