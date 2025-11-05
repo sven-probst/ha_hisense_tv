@@ -12,11 +12,6 @@ from homeassistant.helpers.service import async_extract_entity_ids
 import voluptuous as vol
 
 from homeassistant.components.remote import DOMAIN as REMOTE_DOMAIN
-# Import webostv domain to register compatible services
-try:
-    from homeassistant.components.webostv.const import DOMAIN as WEBOSTV_DOMAIN
-except ImportError:
-    WEBOSTV_DOMAIN = "webostv"
 
 from .const import ( 
     DOMAIN,
@@ -37,6 +32,7 @@ from .const import (
     DEFAULT_KEY_DELAY,
     DEFAULT_CLIENT_ID,
     )
+from .webos_compatibility import async_setup_webos_compatibility, async_unload_webos_compatibility
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -119,6 +115,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         
         return mqtt_out_prefix, target_config_entry
 
+    # Helper function to get the media_player entity
+    def _get_media_player_entity(target_entity_id: str):
+        """Get the media_player entity object."""
+        media_player_entity = hass.data["media_player"].get_entity(target_entity_id)
+        if not media_player_entity:
+            _LOGGER.error("Could not find the hisense_tv media_player for entity_id '%s'.", target_entity_id)
+            return None
+        return media_player_entity
+
     # Register the custom "send_key" service
     async def async_send_key_service(call: ServiceCall):
         """Handles the send_key service call."""
@@ -127,29 +132,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         keys_to_send = call.data[ATTR_KEY]
         entity_ids = await async_extract_entity_ids(call)
 
-        for target_entity_id in entity_ids:
-            mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
-            if not mqtt_out_prefix:
+        for entity_id in entity_ids:
+            media_player = _get_media_player_entity(entity_id)
+            if not media_player:
                 continue
-
-            client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
-            key_delay = target_config_entry.options.get(KEY_DELAY, target_config_entry.data.get(KEY_DELAY, DEFAULT_KEY_DELAY))
-            formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
-
             keys = keys_to_send
-            if isinstance(keys, str):
-                keys = [keys]
-
-            for key in keys:
-                payload = f"KEY_{key}"
-                _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
-                await mqtt.async_publish(
-                    hass=hass,
-                    topic=formatted_topic,
-                    payload=payload,
-                    retain=False,
-                )
-                await asyncio.sleep(key_delay) # A small delay between keys can improve reliability
+            await media_player.async_send_keys(keys if isinstance(keys, list) else [keys])
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_KEY, async_send_key_service, schema=SEND_KEY_SCHEMA
@@ -162,35 +150,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         channel_number = str(call.data[ATTR_CHANNEL])
         entity_ids = await async_extract_entity_ids(call)
 
-        for target_entity_id in entity_ids:
-            mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
-            if not mqtt_out_prefix:
-                continue
-
-            client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
-            key_delay = target_config_entry.options.get(KEY_DELAY, target_config_entry.data.get(KEY_DELAY, DEFAULT_KEY_DELAY))
-            # Use the same sendkey topic, as each digit is a key
-            formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
-
-            _LOGGER.debug("Sending KEY_EXIT before channel digits for entity: %s", target_entity_id)
-            await mqtt.async_publish(
-                hass=hass,
-                topic=formatted_topic,
-                payload="KEY_EXIT",
-                retain=False,
-            )
-            await asyncio.sleep(key_delay)
-
-            for digit in channel_number:
-                key_payload = f"KEY_{digit}"
-                _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, key_payload, target_entity_id)
-                await mqtt.async_publish(
-                    hass=hass,
-                    topic=formatted_topic,
-                    payload=key_payload,
-                    retain=False,
-                )
-                await asyncio.sleep(key_delay)
+        for entity_id in entity_ids:
+            media_player = _get_media_player_entity(entity_id)
+            if media_player:
+                await media_player.async_send_channel(channel_number)
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_CHANNEL, async_send_channel_service, schema=SEND_CHANNEL_SCHEMA
@@ -204,13 +167,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         entity_ids = await async_extract_entity_ids(call)
 
         for target_entity_id in entity_ids:
-            # Get the media_player entity
-            media_player_entity = hass.data["media_player"].get_entity(target_entity_id)
-
+            media_player_entity = _get_media_player_entity(target_entity_id)
             if not media_player_entity:
-                _LOGGER.error("Entity %s not found.", target_entity_id)
                 continue
-
             await media_player_entity.async_launch_app(app_name)
 
     hass.services.async_register(
@@ -224,42 +183,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         text_to_send = call.data[ATTR_TEXT]
         entity_ids = await async_extract_entity_ids(call)
 
-        for target_entity_id in entity_ids:
-            _LOGGER.debug("Sending text: '%s'", text_to_send)
-
-            mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
-            # Use a shorter, fixed delay for text input as it's more sensitive
-            key_delay = 0.1
-            if not mqtt_out_prefix:
-                continue
-
-            client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
-            formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/input"
-            
-            # Send new characters
-            for char in text_to_send:
-                # Handle special character for backspace
-                if char == '\b':
-                    payload = "Lit_BACKSPACE"
-                    await mqtt.async_publish(hass=hass, topic=formatted_topic, payload=payload, retain=False)
-                    await asyncio.sleep(key_delay)
-                    continue
-                # Handle special character for ENTER
-                if char == '\n':
-                    payload = "Lit_ENTER"
-                    await mqtt.async_publish(hass=hass, topic=formatted_topic, payload=payload, retain=False)
-                    await asyncio.sleep(key_delay)
-                    continue
-                
-                payload = f"Lit_{char}" if char != ' ' else "Lit_SPACE"
-                _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
-                await mqtt.async_publish(
-                    hass=hass,
-                    topic=formatted_topic,
-                    payload=payload,
-                    retain=False,
-                )
-                await asyncio.sleep(key_delay)
+        for entity_id in entity_ids:
+            media_player = _get_media_player_entity(entity_id)
+            if media_player:
+                await media_player.async_send_text(text_to_send)
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_TEXT, async_send_text_service, schema=SEND_TEXT_SCHEMA
@@ -280,27 +207,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         entity_ids = await async_extract_entity_ids(call)
 
         for target_entity_id in entity_ids:
-            mqtt_out_prefix, target_config_entry = await _get_target_config_info(target_entity_id)
-            if not mqtt_out_prefix:
+            media_player = _get_media_player_entity(target_entity_id)
+            if not media_player:
                 continue
-
-            client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
-            
-            # Convert to 16-bit signed hex
-            hex_dx = format(dx & 0xFFFF, '04x')
-            hex_dy = format(dy & 0xFFFF, '04x')
-
-            formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/mouse"
-            payload = f"REL_{hex_dx}_{hex_dy}_0000"
-
-            _LOGGER.debug("Publishing to topic: %s with payload: %s (for entity: %s)", formatted_topic, payload, target_entity_id)
-            await mqtt.async_publish(
-                hass=hass,
-                topic=formatted_topic,
-                payload=payload,
-                retain=False,
-            )
-            # No sleep needed for mouse events as they are sent in quick succession
+            # Use the throttled method on the media_player entity
+            await media_player.async_send_mouse_event(dx, dy)
 
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_MOUSE_EVENT, async_send_mouse_event_service, schema=SEND_MOUSE_EVENT_SCHEMA
@@ -335,7 +246,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             app_name = command_string.split(":", 1)[1]
             _LOGGER.debug("Dispatching to launch_app with app_name: %s", app_name)
             # launch_app service calls the entity method directly, so we need to do the same
-            media_player_entity = hass.data["media_player"].get_entity(target_entity_id)
+            media_player_entity = _get_media_player_entity(target_entity_id)
             if media_player_entity:
                 await media_player_entity.async_launch_app(app_name)
             else:
@@ -355,147 +266,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         REMOTE_DOMAIN, "send_command", async_send_command_wrapper_service
     )
 
-    # --- webOS Compatibility Wrappers ---
-
-    # Dictionary to store the last text sent via the webOS wrapper for each entity
-    last_webostv_text = {}
-
-    async def async_webostv_button_wrapper(call: ServiceCall):
-        """Handles webostv.button and wraps it to remote.send_command."""
-        button_pressed = call.data.get("button")
-        target_entity_id = call.data.get(ATTR_ENTITY_ID)
-        _LOGGER.debug("webOS button wrapper called for button: %s", button_pressed)
-        if button_pressed and target_entity_id:
-            # Mapping for keys where webOS name differs from Hisense key
-            key_map = {
-                "LANGUAGE": "LANG",       # Custom button
-                "GUIDE": "EPG",           # Standard webOS key
-                "BACK": "RETURNS",        # Standard webOS key
-                "ENTER": "OK",            # For 'center' button
-                "CENTER": "OK",           # Alias for 'center'
-                "VOLUME_UP": "VOLUMEUP",  # Standard webOS key
-                "VOLUME_DOWN": "VOLUMEDOWN",# Standard webOS key
-                "CAPTIONS": "SUBTITLE",   # Standard webOS key (assuming Hisense key is SUBTITLE)
-                "CC": "SUBTITLE",         # Alias for captions
-                # Keys like 'UP', 'DOWN', 'OK', 'HOME', 'MENU', 'POWER' match automatically
-            }
-
-            # Use the mapped key if it exists, otherwise use the original button name
-            hisense_key = key_map.get(button_pressed.upper(), button_pressed.upper())
-
-            # Translate to our KEY: format
-            command_string = f"KEY:{hisense_key}"
-            
-            await async_send_command_wrapper_service(
-                ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={ "command": command_string, ATTR_ENTITY_ID: target_entity_id })
-            )
-
-    async def async_webostv_launch_wrapper(call: ServiceCall):
-        """Handles webostv.launch and wraps it to remote.send_command."""
-        app_id = call.data.get("app_id")
-        target_entity_id = call.data.get(ATTR_ENTITY_ID)
-        _LOGGER.debug("webOS launch wrapper called for app_id: %s", app_id)
-        if app_id and target_entity_id:
-            # Translate webOS app_id to our APP: format
-            # We capitalize the app name as our dispatcher might expect it
-            command_string = f"APP:{app_id.capitalize()}"
-            await async_send_command_wrapper_service(
-                ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={ "command": command_string, ATTR_ENTITY_ID: target_entity_id })
-            )
-
-    async def async_webostv_command_wrapper(call: ServiceCall):
-        """Handles webostv.command (for keyboard) and wraps it to remote.send_command."""
-        _LOGGER.debug("webOS command wrapper called with data: %s", call.data)
-        target_entity_id = call.data.get(ATTR_ENTITY_ID)
-        if not target_entity_id:
-            return
-
-        command = call.data.get("command")
-        payload = call.data.get("payload", {})
-        text_to_send = payload.get("text")
-
-        # Case 1: Handle text input from keyboard (payload has 'text')
-        if text_to_send is not None:
-            _LOGGER.debug("webOS command wrapper (keyboard) called for text: %s", text_to_send)
-            
-            # If our history is empty, it's the first keypress.
-            # Initialize our history with the actual current text from the TV.
-            if target_entity_id not in last_webostv_text:
-                media_player_entity = hass.data["media_player"].get_entity(target_entity_id)
-                initial_text = getattr(media_player_entity, '_input_text', None) or ""
-                last_webostv_text[target_entity_id] = initial_text
-            old_text = last_webostv_text.get(target_entity_id)
-
-            # Calculate the difference to send only new characters or backspaces
-            common_prefix_len = 0
-            while common_prefix_len < len(old_text) and common_prefix_len < len(text_to_send) and old_text[common_prefix_len] == text_to_send[common_prefix_len]:
-                common_prefix_len += 1
-            
-            backspaces_needed = len(old_text) - common_prefix_len
-            text_to_append = text_to_send[common_prefix_len:]
-
-            # Combine backspaces and new text
-            final_text_to_send = ("\b" * backspaces_needed) + text_to_append
-
-            await async_send_text_service(
-                ServiceCall(hass, domain=DOMAIN, service=SERVICE_SEND_TEXT, data={ATTR_TEXT: final_text_to_send, ATTR_ENTITY_ID: target_entity_id})
-            )
-
-            # Update the last sent text for the entity
-            last_webostv_text[target_entity_id] = text_to_send
-            return
-        
-        # Case 2: Handle pre-filling of the text input field
-        elif command == "system.launcher/getForegroundAppInfo":
-            _LOGGER.debug("webOS command wrapper (pre-fill) called for getForegroundAppInfo")
-            media_player_entity = hass.data["media_player"].get_entity(target_entity_id)
-            if media_player_entity and hasattr(media_player_entity, '_input_text'):
-                # The remote-card looks for a 'text' key in the response payload.
-                hass.bus.async_fire(f"webostv_response_{target_entity_id.replace('.', '_')}", {"payload": {"text": media_player_entity._input_text}})
-            return
-
-        # Case 3: Handle generic commands (like media controls)
-        elif command:
-            _LOGGER.debug("webOS command wrapper (generic) called for command: %s", command)
-            command_map = {
-                "media.controls/stop": "STOP", "media.controls/play": "PLAY", "media.controls/pause": "PAUSE",
-                "media.controls/rewind": "BACK", "media.controls/fastForward": "FORWARDS",
-                "com.webos.service.ime/deleteCharacters": "BACKSPACE", 
-                # Explicitly handle sendEnterKey to send Lit_ENTER, not KEY_ENTER
-                "com.webos.service.ime/sendEnterKey": "LIT_ENTER_SPECIAL",
-            }
-            hisense_key = command_map.get(command)
-            if hisense_key:
-                if hisense_key == "LIT_ENTER_SPECIAL":
-                    # Clear the text history on enter
-                    last_webostv_text.pop(target_entity_id, None)
-                    _LOGGER.debug("webOS command wrapper sending Lit_ENTER for sendEnterKey")
-                    await async_send_text_service(ServiceCall(hass, domain=DOMAIN, service=SERVICE_SEND_TEXT, data={ATTR_TEXT: "\n", ATTR_ENTITY_ID: target_entity_id}))
-                    return
-                _LOGGER.debug("Mapped webOS command '%s' to Hisense key '%s'", command, hisense_key)
-                await async_send_command_wrapper_service(
-                    ServiceCall(hass, domain=REMOTE_DOMAIN, service="send_command", data={"command": f"KEY:{hisense_key}", ATTR_ENTITY_ID: target_entity_id})
-                )
-                # If a backspace was sent, update our text history
-                if hisense_key == "BACKSPACE":
-                    old_text = last_webostv_text.get(target_entity_id, "")
-                    last_webostv_text[target_entity_id] = old_text[:-1]
-
-    # Register the webOS compatibility services if the domain is available
-    if WEBOSTV_DOMAIN:
-        _LOGGER.debug("Registering webOS compatibility services.")
-        hass.services.async_register(
-            WEBOSTV_DOMAIN, "button", async_webostv_button_wrapper
-        )
-        hass.services.async_register(
-            WEBOSTV_DOMAIN, "launch", async_webostv_launch_wrapper
-        )
-        hass.services.async_register(
-            WEBOSTV_DOMAIN, "command", async_webostv_command_wrapper
-        )
-    else:
-        _LOGGER.warning("Could not import webostv domain. Compatibility services will not be available.")
-
+    # Setup the WebOS compatibility layer, passing the helper function
+    await async_setup_webos_compatibility(hass, _get_media_player_entity)
 
     return True
 
@@ -517,16 +289,9 @@ async def async_unload_entry(hass, entry):
     hass.services.async_remove(DOMAIN, SERVICE_SEND_TEXT)
     hass.services.async_remove(DOMAIN, SERVICE_SEND_MOUSE_EVENT)
     hass.services.async_remove(REMOTE_DOMAIN, "send_command")
-    
-    # Unregister webOS compatibility services
-    if WEBOSTV_DOMAIN:
-        hass.services.async_remove(WEBOSTV_DOMAIN, "button")
-        hass.services.async_remove(WEBOSTV_DOMAIN, "launch")
-        hass.services.async_remove(WEBOSTV_DOMAIN, "command")
-    
-    # Clear the text history
-    if "last_webostv_text" in globals():
-        globals()["last_webostv_text"].clear()
+
+    # Unload the WebOS compatibility layer
+    await async_unload_webos_compatibility(hass)
 
     unload_ok = all(
         await asyncio.gather(

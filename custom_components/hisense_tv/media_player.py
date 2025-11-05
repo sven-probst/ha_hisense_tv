@@ -147,6 +147,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._attr_name = f"{name} Control"
 
         self._muted = False
+        self._key_delay = key_delay
         self._attr_unique_id = uid
         self._volume = 0
         self._state = STATE_OFF
@@ -1023,6 +1024,56 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         # Add our custom attribute
         attributes["input_text"] = self._input_text
         return attributes
+
+    async def async_send_key(self, key: str):
+        """Send a single key to the TV."""
+        payload = f"KEY_{key}"
+        _LOGGER.debug("Publishing key: %s", payload)
+        await mqtt.async_publish(
+            hass=self._hass,
+            topic=self._out_topic("/remoteapp/tv/remote_service/%s/actions/sendkey"),
+            payload=payload,
+            retain=False,
+        )
+
+    async def async_send_keys(self, keys: list[str]):
+        """Send a sequence of keys with delays."""
+        for key in keys:
+            await self.async_send_key(key)
+            await asyncio.sleep(self._key_delay)
+
+    async def async_send_channel(self, channel: str):
+        """Send a channel number to the TV."""
+        await self.async_send_key("EXIT")
+        await asyncio.sleep(self._key_delay)
+        for digit in channel:
+            await self.async_send_key(digit)
+            await asyncio.sleep(self._key_delay)
+
+    async def async_send_text(self, text: str):
+        """Send a text string to the TV's input field."""
+        # Use a shorter, fixed delay for text input as it's more sensitive
+        text_delay = 0.1
+        formatted_topic = self._out_topic("/remoteapp/tv/remote_service/%s/actions/input")
+
+        for char in text:
+            if char == '\b':
+                payload = "Lit_BACKSPACE"
+            elif char == '\n':
+                payload = "Lit_ENTER"
+            elif char == ' ':
+                payload = "Lit_SPACE"
+            else:
+                payload = f"Lit_{char}"
+
+            _LOGGER.debug("Publishing to topic: %s with payload: %s", formatted_topic, payload)
+            await mqtt.async_publish(
+                hass=self._hass,
+                topic=formatted_topic,
+                payload=payload,
+                retain=False,
+            )
+            await asyncio.sleep(text_delay)
 
     async def async_send_mouse_event(self, dx: int, dy: int):
         """Accumulate and throttle mouse movement events."""
