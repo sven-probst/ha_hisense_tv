@@ -84,6 +84,7 @@ class HisenseTvSwitch(SwitchEntity):
         _LOGGER.debug("Calling async_turn_on for media_player: %s", media_player.entity_id)
         await media_player.async_turn_on()
     
+        await self._async_update_other_media_players()
         # Optimistically set the state to on.
         self._is_on = True
         self.async_write_ha_state()
@@ -97,9 +98,33 @@ class HisenseTvSwitch(SwitchEntity):
         _LOGGER.debug("Calling async_turn_off for media_player: %s", media_player.entity_id)
         await media_player.async_turn_off()
 
+        await self._async_update_other_media_players()
         # Optimistically set the state to off.
         self._is_on = False
         self.async_write_ha_state()
+
+    async def _async_update_other_media_players(self):
+        """Request an update for other media_player entities on the same device."""
+        ent_reg = er.async_get(self.hass)
+        dev_reg = dr.async_get(self.hass)
+
+        # Find the device entry for this switch
+        device_entry = dev_reg.async_get_device(identifiers={(DOMAIN, self._device_unique_id)})
+        if not device_entry:
+            _LOGGER.debug("Could not find device entry for switch to sync others.")
+            return
+
+        # Find all entities for this device
+        device_entities = er.async_entries_for_device(ent_reg, device_entry.id)
+
+        for entity_entry in device_entities:
+            # We only care about media_players that are NOT from our integration
+            if entity_entry.domain == MEDIA_PLAYER_DOMAIN and entity_entry.platform != DOMAIN:
+                _LOGGER.info(
+                    "Requesting update for associated media_player '%s' to sync its state.",
+                    entity_entry.entity_id
+                )
+                await self.hass.services.async_call('homeassistant', 'update_entity', {ATTR_ENTITY_ID: entity_entry.entity_id}, blocking=False)
 
     @property
     def device_info(self):

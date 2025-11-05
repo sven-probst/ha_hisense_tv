@@ -32,6 +32,7 @@ from homeassistant.const import (
     STATE_ON,
     STATE_PLAYING,
 ) 
+from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_registry as er
 
 from .const import (
@@ -648,9 +649,28 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             if state_changed and new_state == STATE_PLAYING:
                 _LOGGER.debug("TV marked as running in HA, querying sourcelist and volume.")
                 await self._request_sourcelist()
+                await self._async_update_other_media_players()
+            elif state_changed and new_state in (STATE_OFF, STATE_STANDBY):
+                _LOGGER.debug("TV marked as off in HA, updating other media players.")
+                await self._async_update_other_media_players()
         else:
             # For retained, just update attributes/UI, but not the state
             self.async_write_ha_state()
+
+    async def _async_update_other_media_players(self):
+        """Request an update for other media_player entities on the same device."""
+        ent_reg = er.async_get(self.hass)
+        dev_reg = dr.async_get(self.hass)
+
+        device_entry = dev_reg.async_get_device(identifiers={(DOMAIN, self._unique_id)})
+        if not device_entry:
+            _LOGGER.debug("Could not find device entry for media_player to sync others.")
+            return
+
+        for entity_entry in er.async_entries_for_device(ent_reg, device_entry.id):
+            if entity_entry.domain == "media_player" and entity_entry.platform != DOMAIN:
+                _LOGGER.info("Requesting update for associated media_player '%s' to sync its state.", entity_entry.entity_id)
+                await self.hass.services.async_call('homeassistant', 'update_entity', {ATTR_ENTITY_ID: entity_entry.entity_id}, blocking=False)
 
     async def _message_received_inputdata(self, msg):
         """received broadcast message 'bwsinputdata'."""
