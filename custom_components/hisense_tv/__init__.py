@@ -33,7 +33,7 @@ from .const import (
     ATTR_DY,
     SSDP_ST,
     CONF_MQTT_OUT,
-    CONF_KEY_DELAY,
+    CONF_KEY_DELAY as KEY_DELAY,
     DEFAULT_KEY_DELAY,
     DEFAULT_CLIENT_ID,
     )
@@ -133,7 +133,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 continue
 
             client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
-            key_delay = target_config_entry.options.get(CONF_KEY_DELAY, target_config_entry.data.get(CONF_KEY_DELAY, DEFAULT_KEY_DELAY))
+            key_delay = target_config_entry.options.get(KEY_DELAY, target_config_entry.data.get(KEY_DELAY, DEFAULT_KEY_DELAY))
             formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
 
             keys = keys_to_send
@@ -168,7 +168,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 continue
 
             client_id_for_topic = target_config_entry.data.get("client_id", DEFAULT_CLIENT_ID)
-            key_delay = target_config_entry.options.get(CONF_KEY_DELAY, target_config_entry.data.get(CONF_KEY_DELAY, DEFAULT_KEY_DELAY))
+            key_delay = target_config_entry.options.get(KEY_DELAY, target_config_entry.data.get(KEY_DELAY, DEFAULT_KEY_DELAY))
             # Use the same sendkey topic, as each digit is a key
             formatted_topic = f"{mqtt_out_prefix}/remoteapp/tv/remote_service/{client_id_for_topic}/actions/sendkey"
 

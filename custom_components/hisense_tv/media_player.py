@@ -40,7 +40,7 @@ from .const import (
     CONF_MQTT_OUT,
     DEFAULT_NAME,
     DOMAIN,
-    KEY_DELAY,
+    CONF_KEY_DELAY,
 )
 from .helper import HisenseTvBase, mqtt_pub_sub
 
@@ -102,7 +102,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     mqtt_in = config_entry.data[CONF_MQTT_IN]
     mqtt_out = config_entry.data[CONF_MQTT_OUT]
     uid = config_entry.unique_id
-    key_delay = config_entry.options.get(KEY_DELAY, 0.2)
+    key_delay = config_entry.options.get(CONF_KEY_DELAY, 0.2)
     if uid is None:
         uid = config_entry.entry_id
 
