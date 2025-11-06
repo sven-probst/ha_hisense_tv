@@ -1128,7 +1128,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         await mqtt.async_publish(
             hass=self._hass,
             topic=self._out_topic(
-                "/remoteapp/tv/remote_service/%s$vidaa_common/actions/mouse"
+                "/remoteapp/tv/remote_service/%s/actions/mouse"
             ),
             payload=payload,
             retain=False,
