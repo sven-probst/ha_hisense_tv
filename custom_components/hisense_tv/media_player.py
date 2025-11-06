@@ -1101,9 +1101,9 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._mouse_dy_total += dy
 
         if not self._mouse_throttle_timer:
-            self._mouse_throttle_timer = self.hass.async_create_timer(
-                self._mouse_throttle_interval, self._async_send_throttled_mouse_event
-            )
+            self._mouse_throttle_timer = self.hass.loop.call_later(
+                self._mouse_throttle_interval, self.hass.async_create_task, self._async_send_throttled_mouse_event()
+            ) 
 
     async def _async_send_throttled_mouse_event(self, _=None):
         """Send the accumulated mouse movement event to the Hisense TV."""
