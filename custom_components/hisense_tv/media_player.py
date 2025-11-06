@@ -1119,11 +1119,16 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._mouse_dy_total = 0
 
         _LOGGER.debug("Sending throttled mouse event: dx=%d, dy=%d", dx_to_send, dy_to_send)
-        payload = json.dumps({"dx": dx_to_send, "dy": dy_to_send})
+        
+        # Convert signed integers to 16-bit two's complement hex strings
+        dx_hex = f"{dx_to_send & 0xFFFF:04x}"
+        dy_hex = f"{dy_to_send & 0xFFFF:04x}"
+        
+        payload = f"REL_{dx_hex}_{dy_hex}_0000"
         await mqtt.async_publish(
             hass=self._hass,
             topic=self._out_topic(
-                "/remoteapp/tv/remote_service/%s$vidaa_common/actions/mousemove"
+                "/remoteapp/tv/remote_service/%s$vidaa_common/actions/mouse"
             ),
             payload=payload,
             retain=False,
