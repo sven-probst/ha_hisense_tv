@@ -19,6 +19,8 @@ Requires Home Assistant >= `2021.12.x`.
 * send keys as single or as sequence from a array via action
 * send touchpad dx/dy-values
 * autodetect TV
+* touchpad support
+* compatibility-layer to webos-tv (choose this TV type while using https://github.com/Nerwyn/universal-remote-card )
 
 TBD:
 * Expose all keys as buttons
@@ -87,6 +89,197 @@ The TV can be turned on by a Wake-on-LAN packet. The MAC address must be configu
 ## Setup in Home Assistant
 
 The integration can be added via the Home Assistant UI. Add the integration and setup your TV. During the first setup your TV should be turned on. The integration requires a PIN code from you TV. The PIN will be triggered automatically during setup. This is a onetime step where the client `HomeAssistant` is requesting access to remote controll the TV.
+
+## Using with https://github.com/Nerwyn/universal-remote-card
+
+working example (please change entities to your control- and power-entity)
+
+~~~
+type: custom:universal-remote-card
+platform: LG webOS
+entity: media_player.wohnzimmer_tv_steuerung
+rows:
+  - - power
+    - volume_mute
+    - language
+  - - menu
+    - home
+  - - - exit
+      - guide
+    - navigation_buttons
+    - - channel_up
+      - channel_down
+  - - back
+  - - red
+    - green
+    - yellow
+    - blue
+  - - youtube
+    - launch_browser
+    - keyboard
+    - textbox
+  - - rewind
+    - fast_forward
+    - play
+    - pause
+    - stop
+  - - monitor_on
+    - monitor_off
+    - fm_radio
+  - touchpad
+media_player_id: media_player.wohnzimmer_tv_steuerung
+custom_actions:
+  - type: button
+    name: launch_browser
+    icon: mdi:web
+    tap_action:
+      action: perform-action
+      data:
+        app_name: TV Browser
+      target:
+        entity_id: media_player.wohnzimmer_tv_steuerung
+      perform_action: hisense_tv.launch_app
+  - type: button
+    name: monitor_off
+    icon: mdi:monitor-off
+    tap_action:
+      action: perform-action
+      data:
+        key:
+          - EXIT
+          - EXIT
+          - MENU
+          - UP
+          - UP
+          - OK
+      perform_action: hisense_tv.send_key
+      target:
+        entity_id: media_player.wohnzimmer_tv_steuerung
+  - type: button
+    name: monitor_on
+    icon: mdi:monitor
+    tap_action:
+      action: perform-action
+      data:
+        key:
+          - EXIT
+          - EXIT
+      perform_action: hisense_tv.send_key
+      target:
+        entity_id: media_player.wohnzimmer_tv_steuerung
+  - type: button
+    name: fm_radio
+    icon: mdi:radio
+    tap_action:
+      action: perform-action
+      data:
+        key:
+          - EXIT
+          - 6
+          - 1
+          - EXIT
+          - EXIT
+          - MENU
+          - UP
+          - UP
+          - OK
+      perform_action: hisense_tv.send_key
+      target:
+        entity_id: media_player.wohnzimmer_tv_steuerung
+  - type: button
+    name: language
+    icon: mdi:translate
+    tap_action:
+      action: perform-action
+      data:
+        key: LANG
+      target:
+        entity_id: media_player.wohnzimmer_tv_steuerung
+      perform_action: hisense_tv.send_key
+  - type: touchpad
+    name: touchpad
+    tap_action:
+      action: perform-action
+      data:
+        key: OK
+      perform_action: hisense_tv.send_key
+      target:
+        entity_id: media_player.wohnzimmer_tv_steuerung
+    up:
+      tap_action:
+        action: key
+        key: up
+      hold_action:
+        action: repeat
+      type: button
+      styles: ""
+    down:
+      tap_action:
+        action: key
+        key: down
+      hold_action:
+        action: repeat
+      type: button
+    left:
+      tap_action:
+        action: key
+        key: left
+      hold_action:
+        action: repeat
+      type: button
+    right:
+      tap_action:
+        action: key
+        key: right
+      hold_action:
+        action: repeat
+      type: button
+    drag_action:
+      action: perform-action
+      perform_action: hisense_tv.send_mouse_event
+      data:
+        dx: |
+          {{ deltaX }}
+        dy: |
+          {{ deltaY }}
+      target:
+        entity_id: media_player.wohnzimmer_tv_steuerung
+      repeat_delay: 1
+    styles: |-
+      :host {
+        top: 50%;
+        left: 50%;
+        width: 80%;
+        height: 80%;
+      }
+      toucharea {
+       border-radius: 10px;
+       border: 1px solid #444;
+      }
+    hold_action:
+      action: keyboard
+      media_player_id: media_player.wohnzimmer_tv_steuerung
+styles: |-
+  #green::part(icon) {
+    color: green;
+  }
+  #red::part(icon) {
+    color: red;
+  }
+  #blue::part(icon) {
+    color: blue;
+  }
+  #yellow::part(icon) {
+    color: yellow;
+  }
+  #power::part(icon) {
+    color: {% if  is_state('switch.wohnzimmer_tv_power','on') %}
+                red
+           {% else %}
+                blue
+           {% endif %};
+  }
+~~~
 
 # YMMV
 
