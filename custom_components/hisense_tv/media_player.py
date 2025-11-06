@@ -660,17 +660,17 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
     async def _async_update_other_media_players(self):
         """Request an update for other media_player entities on the same device."""
         ent_reg = er.async_get(self.hass)
-        dev_reg = dr.async_get(self.hass)
 
-        device_entry = dev_reg.async_get_device(identifiers={(DOMAIN, self._unique_id)})
-        if not device_entry:
+        # Get the device_id from the current entity's entry
+        entity_entry = ent_reg.async_get(self.entity_id)
+        if not entity_entry or not entity_entry.device_id:
             _LOGGER.debug("Could not find device entry for media_player to sync others.")
             return
 
-        for entity_entry in er.async_entries_for_device(ent_reg, device_entry.id):
-            if entity_entry.domain == "media_player" and entity_entry.platform != DOMAIN:
-                _LOGGER.info("Requesting update for associated media_player '%s' to sync its state.", entity_entry.entity_id)
-                await self.hass.services.async_call('homeassistant', 'update_entity', {ATTR_ENTITY_ID: entity_entry.entity_id}, blocking=False)
+        for entry in er.async_entries_for_device(ent_reg, entity_entry.device_id):
+            if entry.domain == "media_player" and entry.platform != DOMAIN:
+                _LOGGER.info("Requesting update for associated media_player '%s' to sync its state.", entry.entity_id)
+                await self.hass.services.async_call('homeassistant', 'update_entity', {ATTR_ENTITY_ID: entry.entity_id}, blocking=False)
 
     async def _message_received_inputdata(self, msg):
         """received broadcast message 'bwsinputdata'."""
