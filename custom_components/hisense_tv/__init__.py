@@ -210,7 +210,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             media_player = _get_media_player_entity(target_entity_id)
             if not media_player:
                 continue
-            # Use the throttled method on the media_player entity
             await media_player.async_send_mouse_event(dx, dy)
 
     hass.services.async_register(

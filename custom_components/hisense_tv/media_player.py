@@ -174,12 +174,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._missed_polls = 0
         self._input_text = None  # store "bwsinputdata"
 
-        # Mouse event throttling
-        self._mouse_dx_total = 0
-        self._mouse_dy_total = 0
-        self._mouse_throttle_timer = None
-        self._mouse_throttle_interval = 0.1  # Send updates every 100ms
-
         self._sourcelist_requested = False
 
     @property
@@ -1096,33 +1090,12 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             await asyncio.sleep(text_delay)
 
     async def async_send_mouse_event(self, dx: int, dy: int):
-        """Accumulate and throttle mouse movement events."""
-        self._mouse_dx_total += dx
-        self._mouse_dy_total += dy
-
-        if not self._mouse_throttle_timer:
-            self._mouse_throttle_timer = self.hass.loop.call_later(
-                self._mouse_throttle_interval, self.hass.async_create_task, self._async_send_throttled_mouse_event()
-            ) 
-
-    async def _async_send_throttled_mouse_event(self, _=None):
-        """Send the accumulated mouse movement event to the Hisense TV."""
-        if self._mouse_dx_total == 0 and self._mouse_dy_total == 0:
-            self._mouse_throttle_timer = None
-            return
-
-        dx_to_send = self._mouse_dx_total
-        dy_to_send = self._mouse_dy_total
-
-        # Reset accumulators
-        self._mouse_dx_total = 0
-        self._mouse_dy_total = 0
-
-        _LOGGER.debug("Sending throttled mouse event: dx=%d, dy=%d", dx_to_send, dy_to_send)
+        """Send a relative mouse movement event directly to the TV."""
+        _LOGGER.debug("Sending mouse event: dx=%d, dy=%d", dx, dy)
         
         # Convert signed integers to 16-bit two's complement hex strings
-        dx_hex = f"{dx_to_send & 0xFFFF:04x}"
-        dy_hex = f"{dy_to_send & 0xFFFF:04x}"
+        dx_hex = f"{dx & 0xFFFF:04x}"
+        dy_hex = f"{dy & 0xFFFF:04x}"
         
         payload = f"REL_{dx_hex}_{dy_hex}_0000"
         await mqtt.async_publish(
@@ -1133,6 +1106,3 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             payload=payload,
             retain=False,
         )
-
-        # Reset the timer so the next movement will start a new one
-        self._mouse_throttle_timer = None
