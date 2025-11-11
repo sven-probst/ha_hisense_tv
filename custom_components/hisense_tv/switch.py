@@ -84,7 +84,7 @@ class HisenseTvSwitch(SwitchEntity):
         _LOGGER.debug("Calling async_turn_on for media_player: %s", media_player.entity_id)
         await media_player.async_turn_on()
     
-        await self._async_update_other_media_players()
+        await self._async_update_other_media_players(is_turning_on=True)
         # Optimistically set the state to on.
         self._is_on = True
         self.async_write_ha_state()
@@ -98,12 +98,12 @@ class HisenseTvSwitch(SwitchEntity):
         _LOGGER.debug("Calling async_turn_off for media_player: %s", media_player.entity_id)
         await media_player.async_turn_off()
 
-        await self._async_update_other_media_players()
+        await self._async_update_other_media_players(is_turning_on=False)
         # Optimistically set the state to off.
         self._is_on = False
         self.async_write_ha_state()
 
-    async def _async_update_other_media_players(self):
+    async def _async_update_other_media_players(self, is_turning_on: bool = False):
         """Request an update for other media_player entities on the same device."""
         ent_reg = er.async_get(self.hass)
 
@@ -112,6 +112,12 @@ class HisenseTvSwitch(SwitchEntity):
         if not entity_entry or not entity_entry.device_id:
             _LOGGER.debug("Could not find device entry for switch to sync others.")
             return
+
+        if is_turning_on:
+            # When turning on, the TV needs some time for services like DLNA to become available.
+            # We wait before triggering an update on other entities.
+            _LOGGER.debug("Waiting 10 seconds before updating other media_players to allow TV services to start.")
+            await asyncio.sleep(10)
 
         # Find all entities for this device and update them
         for entry in er.async_entries_for_device(ent_reg, entity_entry.device_id):

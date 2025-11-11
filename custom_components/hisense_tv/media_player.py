@@ -650,10 +650,16 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         else:
             # For retained, just update attributes/UI, but not the state
             self.async_write_ha_state()
-
-    async def _async_update_other_media_players(self):
+            
+    async def _async_update_other_media_players(self, is_turning_on: bool = False):
         """Request an update for other media_player entities on the same device."""
         ent_reg = er.async_get(self.hass)
+
+        if is_turning_on:
+            # When turning on, the TV needs some time for services like DLNA to become available.
+            # We wait before triggering an update on other entities.
+            _LOGGER.debug("Waiting 10 seconds before updating other media_players to allow TV services to start.")
+            await asyncio.sleep(10)
 
         # Get the device_id from the current entity's entry
         entity_entry = ent_reg.async_get(self.entity_id)
