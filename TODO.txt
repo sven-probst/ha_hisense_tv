@@ -55,7 +55,7 @@ hisense/remoteapp/mobile/broadcast/ui_service/state {
 }
 hisense/remoteapp/tv/platform_service/HomeAssistant/actions/getdeviceinfo (null)
 hisense/remoteapp/mobile/HomeAssistant/platform_service/data/getdeviceinfo {
-        "eth0": "54df1b48606a",
+        "eth0": "XX:XX:XX:XX:XX:XX",
         "wlan0":        "000000000000",
         "ip":   "192.168.0.252",
         "tv_name":      "Wohnzimmer-TV",
@@ -73,7 +73,7 @@ hisense/remoteapp/tv/platform_service/HomeAssistant/actions/gettvinfo (null)
 hisense/remoteapp/mobile/HomeAssistant/platform_service/data/gettvinfo {
         "brand":        "tve",
         "featurecode":  "861003009000016000000730",
-        "deviceid":     "861003009000016000000730jihcd3idthijpkf6i7j4hieulg47o4ev",
+        "deviceid":     "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
         "capability":   "2022092001",
         "tuner_num":    1,
         "fake_sleep":   1,
@@ -125,28 +125,28 @@ hisense/remoteapp/mobile/broadcast/platform_service/data/picturesetting {
 
 enter text in textfield
 
-hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_a
+hisense/remoteapp/tv/remote_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/input Lit_a
 hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"a"}
 hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
-hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_b
+hisense/remoteapp/tv/remote_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/input Lit_b
 hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"ab"}
 hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
-hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_c
+hisense/remoteapp/tv/remote_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/input Lit_c
 hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"abc"}
 hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
-hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_d
+hisense/remoteapp/tv/remote_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/input Lit_d
 hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"abcd"}
 hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
-hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_e
+hisense/remoteapp/tv/remote_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/input Lit_e
 hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"abcde"}
 hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
-hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_f
+hisense/remoteapp/tv/remote_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/input Lit_f
 hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"abcdef"}
 hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
-hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_BACKSPACE
+hisense/remoteapp/tv/remote_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/input Lit_BACKSPACE
 hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":1,"inputdata":"abcde"}
 hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
-hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_ENTER
+hisense/remoteapp/tv/remote_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/input Lit_ENTER
 hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":0,"inputdata":""}
 hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 0
 
@@ -321,3 +321,92 @@ data/tokenissuance            - Token Ausstellung
 - FTE (First Time Experience) Features
 
 Diese Topics ermöglichen die komplette Fernsteuerung des Hisense TVs inklusive App-Verwaltung, Sprachsteuerung, Authentifizierung und Systemstatus-Abfragen.
+
+
+
+Topic: /remoteapp/tv/platform_service/HomeAssistant/actions/get_setting_info
+Bedingung: Wird gesendet, um spezifische Einstellungsinformationen vom Fernseher abzufragen.
+Parameter (Payload): Ein JSON-Objekt, das die gewünschten Einstellungs-Schlüssel spezifiziert. Beispiel: {"keys": ["picture_mode", "sound_mode"]}.
+
+Topic: /remoteapp/tv/ui_service/HomeAssistant/actions/show_notification
+Bedingung: Wird gesendet, um eine Benachrichtigung auf dem Fernsehbildschirm anzuzeigen.
+Parameter (Payload): Ein JSON-Objekt mit dem anzuzeigenden Text und optional weiteren Parametern wie der Anzeigedauer. Beispiel: {"message": "Verbindung hergestellt"}.
+
+hisense/remoteapp/tv/ui_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/vidaa_app_connect {"app_version":2,"connect_result":0,"device_type":"Mobile App"}
+hisense/remoteapp/mobile/broadcast/ui_service/data/hotelmodechange {"hotel_mode":"off"}
+hisense/remoteapp/mobile/XX:XX:XX:XX:XX:XX$vidaa_common/ui_service/data/vidaa_app_connect {"connect_result":1}
+hisense/remoteapp/tv/platform_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/getdeviceinfo (null)
+hisense/remoteapp/mobile/XX:XX:XX:XX:XX:XX$vidaa_common/platform_service/data/getdeviceinfo {
+        "eth0": "XX:XX:XX:XX:XX:XX",
+        "wlan0":        "000000000000",
+        "ip":   "192.168.0.252",
+        "tv_name":      "Wohnzimmer-TV",
+        "voice":        "2",
+        "platform":     "1",
+        "transport_protocol":   "2140",
+        "region":       "4",
+        "vidaa_support":        "1",
+        "country":      "DEU",
+        "language":     "eng",
+        "model_name":   "VS1140FD1_0400",
+        "tv_version":   "V0000.06.10O.N0717"
+}
+hisense/remoteapp/tv/platform_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/getplatformcapbility (null)
+hisense/remoteapp/tv/platform_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/gettvinfo (null)
+hisense/remoteapp/tv/ui_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/capability (null)
+hisense/remoteapp/mobile/XX:XX:XX:XX:XX:XX$vidaa_common/platform_service/data/getplatformcapbility [{
+                "name": "picture_setting",
+                "version":      "U4"
+        }, {
+                "name": "volume",
+                "version":      "00.00.01"
+        }, {
+                "name": "tv_name",
+                "version":      "00.00.01"
+        }, {
+                "name": "booking_list",
+                "version":      "00.00.01"
+        }, {
+                "name": "pvr",
+                "version":      "00.00.01"
+        }, {
+                "name": "reminder",
+                "version":      "00.00.01"
+        }, {
+                "name": "screen_capture",
+                "version":      "00.00.01"
+        }, {
+                "name": "channel",
+                "version":      "00.00.01"
+        }, {
+                "name": "fake_standby",
+                "version":      "00.00.01"
+        }]
+hisense/remoteapp/tv/ui_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/sourcelist (null)
+hisense/remoteapp/tv/ui_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/appversion (null)
+hisense/remoteapp/mobile/XX:XX:XX:XX:XX:XX$vidaa_common/ui_service/data/capability {"app_edit":1,"tvBrowser":"odin","rename":1,"produceDate":"P.N0717","softwareVersion":"V0400.06.10O.N0717","vendorBrand":"tve","searchnow":1,"emanual":1,"deviceType":0,"playerFamilyVersion":"006001000","playerFamilyName":"VD9602O_EU","devicemsg":"VS1140FD1_0400","zone":3600,"baseUIVersion":"os_t.baseui.1.0.K1030","chipplatform":"MT9900"}
+hisense/remoteapp/mobile/XX:XX:XX:XX:XX:XX$vidaa_common/ui_service/data/appversion "1762965423299"
+hisense/remoteapp/mobile/XX:XX:XX:XX:XX:XX$vidaa_common/platform_service/data/gettvinfo {
+        "brand":        "tve",
+        "featurecode":  "861003009000016000000730",
+        "deviceid":     "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+        "capability":   "2022092001",
+        "tuner_num":    1,
+        "fake_sleep":   1,
+        "fake_sleep_state":     1,
+        "audio_capture_supported":      0,
+        "screen_capture_supported":     1,
+        "audio_capture_version":        0
+}
+hisense/remoteapp/tv/platform_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/getvolume (null)
+hisense/remoteapp/mobile/broadcast/platform_service/actions/volumechange {
+        "volume_type":  2,
+        "volume_value": 0
+}
+hisense/remoteapp/mobile/broadcast/platform_service/actions/volumechange {
+        "volume_type":  0,
+        "volume_value": 8
+}
+hisense/remoteapp/tv/ui_service/XX:XX:XX:XX:XX:XX$vidaa_common/actions/vidaaapplist (null)
+hisense/remoteapp/mobile/XX:XX:XX:XX:XX:XX$vidaa_common/ui_service/data/applist [{"url":"https://api-portal-v3.netrange.com/portal/v3/appredir?PrKey=645e94eb48044bb07a88090c250b472f842d77ee&AppId=190","isunInstalled":false,"name":"ARD Mediathek","from":"","storeType":93,"appId":"crawler_60061_nrmmh-190","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311060832013925.jpg"},{"url":"https://new-hbbtv.zdf.de/hisense.html","isunInstalled":false,"name":"ZDF","from":"","storeType":98,"appId":"187","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311090927051313.png"},{"url":"browser","isunInstalled":false,"name":"TV Browser","from":"","storeType":100,"appId":"16","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/4/202304130850562636.png"},{"url":"https://smarttv.dw.com/dwtvapp-vidaaos/","isunInstalled":true,"name":"DW","from":"","storeType":99,"appId":"1685","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2022/8/202208231018137637.jpg?resize=w_300,h_300"},{"url":"https://tvmodules-vidaa.vidaahub.com/publicvalue/V1.0/index-publicvalue.html","isunInstalled":false,"name":"Public value","from":"","storeType":99,"appId":"2081","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311210713198850.png"},{"url":"https://app.hisense.rtl-smart.tv/","isunInstalled":false,"name":"RTL TVNOW","from":"","storeType":97,"appId":"300","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311090925176358.png"},{"url":"https://vidaa-v2.servustv.com","isunInstalled":false,"name":"ServusTV","from":"","storeType":99,"appId":"323","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311090927409428.png"},{"url":"youtube","isunInstalled":false,"name":"YouTube","from":"","storeType":98,"appId":"3","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311090858299321.png"},{"url":"media","isunInstalled":false,"name":"Media","from":"","storeType":98,"appId":"44","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311210709463531.png"},{"url":"https://vidaa.webvideocaster.com","isunInstalled":true,"name":"Web Video Caster Receiver","from":"","storeType":99,"appId":"1612","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/9/202309181329159453.jpg?resize=w_300,h_300"},{"url":"vidaa-free","isunInstalled":false,"name":"VIDAA Free","from":"","storeType":98,"appId":"184","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311210732337444.png"},{"url":"https://prod-hisense-ui40-app.rakuten.tv/","isunInstalled":false,"name":"Rakuten TV","from":"","storeType":99,"appId":"65","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311090900492844.png"},{"url":"https://app-hisense.pluto.tv/","isunInstalled":false,"name":"Pluto TV - It’s Free TV","from":"","storeType":98,"appId":"173","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2024/4/202404160631521045.jpg"},{"url":"vidaa-art","isunInstalled":false,"name":"VIDAA Art","from":"","storeType":99,"appId":"185","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2024/6/202406240244119428.png"},{"url":"https://app.plex.tv/tv-vidaa","isunInstalled":false,"name":"Plex","from":"","storeType":98,"appId":"42","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311090915047445.png"},{"url":"vidaa-store","isunInstalled":false,"name":"APP STORE","from":"","storeType":99,"appId":"164","move":true,"isFav":true,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311210659518385.png"},{"url":"https://live.prd.ott.s.joyn.de/?platform=vidaa","isunInstalled":false,"name":"JOYN","from":"","storeType":99,"appId":"1908","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2025/10/202510090241163099.jpg"},{"url":"https://ads-privacy.vidaahub.com/","isunInstalled":false,"name":"Ads Privacy","from":"","storeType":99,"appId":"2470","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2025/8/202508261016179457.png"},{"url":"https://vidaa.waipu.tv/","isunInstalled":false,"name":"waipu.tv – Live TV Streaming","from":"","storeType":99,"appId":"2414","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2025/9/202509030611207131.png"},{"url":"https://tvapps.o2online.de/45/vidaa/redirector/APP/","isunInstalled":false,"name":"O2 TV","from":"","storeType":99,"appId":"2484","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2025/6/202506050244071304.png"},{"url":"https://tvmodules-vidaa.vidaahub.com/VIDAAKids/V1.0/index-kids.html?webappLogo=true","isunInstalled":false,"name":"VIDAA   Kids","from":"","storeType":99,"appId":"186","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2024/7/202407030313357788.jpg"},{"url":"https://file-dl.vidaahub.com/other/2024/08/index-sunset0814_1914e77467c.html","isunInstalled":false,"name":"YouTube Kids Sunset","from":"","storeType":99,"appId":"2351","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2024/7/202407010642592011.png"},{"url":"http://vidaa.smartone-iptv.com","isunInstalled":true,"name":"Smartone IPTV","from":"","storeType":98,"appId":"1470","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2024/2/202402260739304990.png"},{"url":"https://atve.tv.apple.com/94819831-5404-4438-810e-afb648d6a826/tvw_1dc2aab0a313427dbc11818be8a18bd9/","isunInstalled":false,"name":"AppleTV+","from":"","storeType":99,"appId":"351","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2025/11/202511050649298835.png"},{"url":"https://hisense.chili.com","isunInstalled":false,"name":"Chili","from":"","storeType":98,"appId":"73","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311090913449937.png"},{"url":"amazon","isunInstalled":false,"name":"Prime Video","from":"","storeType":98,"appId":"2","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2024/11/202411210932408667.png"},{"url":"netflix","isunInstalled":false,"name":"Netflix","from":"","storeType":98,"appId":"1","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311090857551807.png"},{"url":"https://cd-dmgz.bamgrid.com/bbd/hisense_tv/index.html","isunInstalled":false,"name":"Disney+","from":"","storeType":99,"appId":"295","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2024/11/202411260732081526.png"},{"url":"https://ott-apps.fite.tv/hisense/index.html","isunInstalled":false,"name":"Triller TV.","from":"","storeType":99,"appId":"245","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2024/1/202401240916139001.png"},{"url":"https://tv.dazn.com/app/vidaa/","isunInstalled":false,"name":"DAZN","from":"","storeType":99,"appId":"162","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2024/5/202405300640297559.png"},{"url":"https://www.intl.paramountplus.com/smart-console-apps/vidaa/","isunInstalled":false,"name":"Paramount+","from":"","storeType":99,"appId":"334","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2022/5/202205090739158843.png"},{"url":"https://dice-tv.imggaming.com/vidaa/dce.uefatv/index.html#/","isunInstalled":false,"name":"UEFA.tv","from":"","storeType":99,"appId":"244","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311090919094943.png"},{"url":"https://tv2.deezer.com/hisense","isunInstalled":false,"name":"DEEZER","from":"","storeType":98,"appId":"47","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2025/1/202501100241497703.png"},{"url":"https://france24.tv.dotscreen.com/hisense/index.html?languages=EN,FR,ES,AR","isunInstalled":false,"name":"France24","from":"","storeType":99,"appId":"372","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2022/2/202202070800239017.png"},{"url":"https://maxdomesmarttv3.meinvod.de/","isunInstalled":false,"name":"Maxdome","from":"","storeType":98,"appId":"143","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311060838581821.png"},{"url":"https://ctv-prod.kidoodle.tv/vidaa/index.html","isunInstalled":false,"name":"Kidoodle TV","from":"","storeType":99,"appId":"233","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2024/6/202406060647556689.png"},{"url":"https://vidaa-v2.redbull.tv","isunInstalled":false,"name":"Red Bull TV","from":"","storeType":99,"appId":"79","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311090916463905.png"},{"url":"accuweather","isunInstalled":false,"name":"AccuWeather","from":"","storeType":99,"appId":"15","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311091029582894.png"},{"url":"https://cweb-ott.nba.com/","isunInstalled":false,"name":"NBA","from":"","storeType":99,"appId":"293","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2022/9/202209160010272173.png"},{"url":"http://apps.tvgam.es/tv_games/hisense_portal/production/portal/index.html","isunInstalled":false,"name":"Game Center","from":"","storeType":98,"appId":"35","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311090915362271.png"},{"url":"https://tv-production.mubi.com/vidaa/4.0.0/","isunInstalled":false,"name":"MUBI","from":"","storeType":99,"appId":"230","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2022/4/202204300235256422.png"},{"url":"https://html5.toongoggles.com/","isunInstalled":false,"name":"ToonGoggles","from":"","storeType":99,"appId":"36","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311060906446498.png"},{"url":"https://dice-tv.imggaming.com/vidaa/dce.ufc/index.html","isunInstalled":false,"name":"UFC","from":"","storeType":99,"appId":"355","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311090930102217.png"},{"url":"file:///APPS/emanual/Local_ebook/index.html","isunInstalled":false,"name":"E-Manual","from":"","storeType":99,"appId":"166","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311210706069065.png"},{"url":"file:///APPS/emanual/Local_ebook/index.html?fromTransparency=1","isunInstalled":false,"name":"Richtlinien","from":"","storeType":99,"appId":"296","move":true,"isFav":false,"httpIcon":"data:image/png;base64,iconDownloadhttps://img.vidaahub.com/vidaa/2023/11/202311090924486903.png"}]
+hisense/remoteapp/mobile/XX:XX:XX:XX:XX:XX$vidaa_common/ui_service/data/sourcelist [{"sourceid":"TV","sourcename":"TV","displayname":"TV","displayname2":"","httpIcon":"","is_signal":"1","has_signal":"1","is_lock":"0","hotel_mode":"0"},{"sourceid":"HDMI1","sourcename":"HDMI1","displayname":"HDMI1","displayname2":"","httpIcon":"","is_signal":"0","has_signal":"0","is_lock":"0","hotel_mode":"0"},{"sourceid":"HDMI2","sourcename":"HDMI2","displayname":"HDMI2","displayname2":"","httpIcon":"","is_signal":"0","has_signal":"0","is_lock":"0","hotel_mode":"0"},{"sourceid":"AVS","sourcename":"AV","displayname":"AV","displayname2":"","httpIcon":"","is_signal":"0","has_signal":"0","is_lock":"0","hotel_mode":"0"}]

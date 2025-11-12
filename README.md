@@ -15,7 +15,6 @@ Requires Home Assistant >= `2021.12.x`.
   * LNB selector
   * Channel selector
   * Apps
-* Read picture setting
 * send keys as single or as sequence from a array via action
 * send touchpad dx/dy-values
 * autodetect TV
@@ -23,6 +22,7 @@ Requires Home Assistant >= `2021.12.x`.
 * compatibility-layer to webos-tv (choose this TV type while using https://github.com/Nerwyn/universal-remote-card )
 
 TBD:
+* Read picture setting
 * Expose all keys as buttons
 * Enhance EPG/guide handling
 
@@ -283,8 +283,8 @@ styles: |-
 
 # YMMV
 
-Tested on an [Hisense A71 Series](https://hisenseme.com/product/75-65-58-55-50-43-a71-series/) with mandatory client certificates. `gettvstate` does not return a `state` but can be used to authenticate the client.
-The 
+Tested on an [Toshiba 40LV3E63DG](https://toshiba-tv.com/de-de/smart-tvs/40lv3e63dg) with mandatory client certificates. `gettvstate` does not return a `state` but can be used to authenticate the client.
+
 
 # Acknowledgment
 Everything I needed to write this integration could be gathered from these sources. Information about the MQTT topics, credentials or certificates can be found there.
