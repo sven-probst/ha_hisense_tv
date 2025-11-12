@@ -1,4 +1,5 @@
 """Hisense TV switch entity"""
+import asyncio
 import logging
 
 from homeassistant.components.media_player import SERVICE_TURN_OFF

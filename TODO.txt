@@ -149,3 +149,175 @@ hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 1
 hisense/remoteapp/tv/remote_service/9a:7f:0e:18:c9:de$vidaa_common/actions/input Lit_ENTER
 hisense/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata {"vkbstatus":0,"inputdata":""}
 hisense/remoteapp/mobile/broadcast/platform_service/actions/vkbinvoke 0
+
+###################
+
+vidaa_app_connect: {"app_version":2,"connect_result":0,"device_type":"Mobile App"}
+
+vidaa_app_ble_connect: {"app_version":1}
+
+authenticationcode: {"authNum":"123456"}
+
+##########
+
+// Die verwendeten Topics (über a.s(), a.q(), a.r(), a.p(), a.c()) sind:
+
+// a.s("gettvstate")                -> /remoteapp/tv/ui_service/%s/actions/gettvstate
+// a.s("capability")                -> /remoteapp/tv/ui_service/%s/actions/capability
+// a.s("vidaa_app_ble_connect")     -> /remoteapp/tv/ui_service/%s/actions/vidaa_app_ble_connect
+// a.s("vidaa_app_connect")         -> /remoteapp/tv/ui_service/%s/actions/vidaa_app_connect
+// a.s("applisticon")               -> /remoteapp/tv/ui_service/%s/actions/applisticon
+// a.s("vidaaapplist")              -> /remoteapp/tv/ui_service/%s/actions/vidaaapplist
+// a.s("applist")                   -> /remoteapp/tv/ui_service/%s/actions/applist
+// a.s("appversion")                -> /remoteapp/tv/ui_service/%s/actions/appversion
+// a.q("getdeviceinfo")             -> /remoteapp/tv/platform_service/%s/actions/getdeviceinfo
+// a.q("getplatformcapbility")      -> /remoteapp/tv/platform_service/%s/actions/getplatformcapbility
+// a.s("sourcelist")                -> /remoteapp/tv/ui_service/%s/actions/sourcelist
+// a.s("gettvstate")                -> /remoteapp/tv/ui_service/%s/actions/gettvstate
+// a.q("gettvinfo")                 -> /remoteapp/tv/platform_service/%s/actions/gettvinfo
+// a.q("getvolume")                 -> /remoteapp/tv/platform_service/%s/actions/getvolume
+// a.s("launchapp")                 -> /remoteapp/tv/ui_service/%s/actions/launchapp
+// a.s("editedapplist")             -> /remoteapp/tv/ui_service/%s/actions/editedapplist
+// a.s("authenticationcode")        -> /remoteapp/tv/ui_service/%s/actions/authenticationcode
+// a.s("authenticationcodeclose")   -> /remoteapp/tv/ui_service/%s/actions/authenticationcodeclose
+// a.p("gettoken")                  -> /remoteapp/tv/platform_service/%s/actions/gettoken
+// a.r("sendkey")                   -> /remoteapp/tv/remote_service/%s/actions/sendkey
+// a.r("input")                     -> /remoteapp/tv/remote_service/%s/actions/input
+// a.r("mouse")                     -> /remoteapp/tv/remote_service/%s/actions/mouse
+// a.c("voicedata")                 -> /remoteapp/tv/voice_service/%s/actions/voicedata
+// a.c("voicestart")                -> /remoteapp/tv/voice_service/%s/actions/voicestart
+// a.c("voicestop")                 -> /remoteapp/tv/voice_service/%s/actions/voicestop
+// a.s("dlnastop")                  -> /remoteapp/tv/ui_service/%s/actions/dlnastop
+// a.s("vidaa_app_fte_config_data") -> /remoteapp/tv/ui_service/%s/actions/vidaa_app_fte_config_data
+// a.s("vidaa_app_fte_status")      -> /remoteapp/tv/ui_service/%s/actions/vidaa_app_fte_status
+// a.s("vidaa_app_fte_close")       -> /remoteapp/tv/ui_service/%s/actions/vidaa_app_fte_close
+// a.s("login_each_other_info")     -> /remoteapp/tv/ui_service/%s/actions/login_each_other_info
+
+Basierend auf der Analyse aller Klassen hier die vollständige Liste aller MQTT Topics:
+
+## **Komplette Topic-Liste der Hisense Remote App**
+
+### **📤 VON APP AN TV GESENDETE TOPICS (Publish)**
+
+#### **UI Service** (`/remoteapp/tv/ui_service/%s/actions/`)
+```
+gettvstate                    - TV Status abfragen
+capability                    - UI Fähigkeiten abfragen
+vidaa_app_ble_connect         - BLE Verbindung herstellen
+vidaa_app_connect             - WiFi Verbindung herstellen
+applisticon                   - App Icon abfragen
+vidaaapplist                  - Vidaa App-Liste abfragen (Standard)
+applist                       - App-Liste abfragen (Protocol 1140)
+appversion                    - App Version abfragen
+sourcelist                    - Quellen-Liste abfragen
+launchapp                     - App starten
+editedapplist                 - Bearbeitete App-Liste senden
+authenticationcode            - Authentifizierungscode senden
+authenticationcodeclose       - Authentifizierung beenden
+dlnastop                      - DLNA stoppen
+vidaa_app_fte_config_data     - FTE Konfigurationsdaten
+vidaa_app_fte_status          - FTE Status senden
+vidaa_app_fte_close           - FTE beenden
+login_each_other_info         - Gegenseitige Login-Info
+uievent                       - UI Ereignis
+changesource                  - Quelle wechseln
+```
+
+#### **Platform Service** (`/remoteapp/tv/platform_service/%s/actions/`)
+```
+getdeviceinfo                 - Geräteinformationen abfragen
+getplatformcapbility          - Plattform-Fähigkeiten abfragen
+gettvinfo                     - TV Informationen abfragen
+getvolume                     - Lautstärke abfragen
+changevolume                  - Lautstärke ändern
+gettoken                      - Token aktualisieren
+```
+
+#### **Remote Service** (`/remoteapp/tv/remote_service/%s/actions/`)
+```
+sendkey                       - Tastendruck senden
+input                         - Texteingabe senden
+mouse                         - Mausbefehl senden
+```
+
+#### **Voice Service** (`/remoteapp/tv/voice_service/%s/actions/`)
+```
+voicedata                     - Sprachdaten senden
+voicestart                    - Spracherkennung starten
+voicestop                     - Spracherkennung stoppen
+```
+
+### **📥 VOM TV AN APP GESENDETE TOPICS (Subscribe)**
+
+#### **UI Service Broadcast** (`/remoteapp/tv/ui_service/broadcast/`)
+```
+actions/sourcechange          - Quelle wurde geändert
+actions/applistverchange      - App-Liste Version geändert
+actions/initsuccess           - Initialisierung erfolgreich
+state/tvstate                 - TV Status update
+data/hotelmodechange          - Hotel-Modus geändert
+data/txtinputdata             - Texteingabe-Daten
+```
+
+#### **Platform Service Broadcast** (`/remoteapp/tv/platform_service/broadcast/`)
+```
+actions/volumechange          - Lautstärke wurde geändert
+actions/vkbinvoke             - Virtuelle Tastatur aufgerufen
+actions/tvsleep               - TV in Sleep-Modus
+actions/bwsinputdata          - Browser Eingabedaten
+actions/sourceinsert          - Quelle eingefügt
+data/voicetype                - Sprachtyp information
+```
+
+#### **UI Client Responses** (`/remoteapp/tv/ui_service/[client_id]/`)
+```
+data/applisticon              - App Icon Daten (Antwort)
+data/applist                  - App-Liste (Antwort)
+data/capability               - UI Fähigkeiten (Antwort)
+data/authenticationcode       - Authentifizierungs-Result
+data/vidaa_app_connect        - Verbindungs-Result
+data/vidaa_app_ble_connect    - BLE Verbindungs-Result
+data/authentication           - Authentifizierungs-Request
+data/login_each_other_info    - Login Info Response
+data/vidaa_app_fte_config_data- FTE Config Response
+data/appversion               - App Version Response
+data/authenticationcodetoast  - Auth Code Toast
+data/authenticationcodeclose  - Auth Close Response
+data/sourcelist               - Quellen-Liste Response
+data/vidaa_app_fte_status     - FTE Status Response
+data/vidaa_app_fte_finish     - FTE Beendet
+data/closeinput               - Eingabe beenden
+```
+
+#### **Platform Client Responses** (`/remoteapp/tv/platform_service/[client_id]/`)
+```
+data/getdeviceinfo            - Geräteinfo Response
+data/getplatformcapbility     - Plattform-Fähigkeiten Response
+data/gettvinfo                - TV Info Response
+data/tokenissuance            - Token Ausstellung
+```
+
+### **🔑 WICHTIGE PAYLOADS:**
+
+#### **Verbindung:**
+- `vidaa_app_connect`: `{"app_version":2,"connect_result":0,"device_type":"Mobile App"}`
+- `vidaa_app_ble_connect`: `{"app_version":1}`
+- `authenticationcode`: `{"authNum":"123456"}`
+
+#### **Steuerung:**
+- `sendkey`: `"KEY_HOME"`, `"KEY_POWER"`, `"KEY_VOLUMEUP"`, etc.
+- `changevolume`: `"50"` (Lautstärkewert 0-100)
+
+### **🔄 PROTOKOLL-UNTERSCHIEDE:**
+
+#### **Protocol 1140:**
+- Verwendet `applist` statt `vidaaapplist`
+- Automatische Status/Capability-Abfrage
+- Kein BLE Support
+
+#### **Standard Vidaa:**
+- Verwendet `vidaaapplist` 
+- BLE Unterstützung via `vidaa_app_ble_connect`
+- FTE (First Time Experience) Features
+
+Diese Topics ermöglichen die komplette Fernsteuerung des Hisense TVs inklusive App-Verwaltung, Sprachsteuerung, Authentifizierung und Systemstatus-Abfragen.

@@ -643,10 +643,10 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             if state_changed and new_state == STATE_PLAYING:
                 _LOGGER.debug("TV marked as running in HA, querying sourcelist and volume.")
                 await self._request_sourcelist()
-                await self._async_update_other_media_players()
+                await self._async_update_other_media_players(is_turning_on=True)
             elif state_changed and new_state in (STATE_OFF, STATE_STANDBY):
                 _LOGGER.debug("TV marked as off in HA, updating other media players.")
-                await self._async_update_other_media_players()
+                await self._async_update_other_media_players(is_turning_on=False)
         else:
             # For retained, just update attributes/UI, but not the state
             self.async_write_ha_state()
