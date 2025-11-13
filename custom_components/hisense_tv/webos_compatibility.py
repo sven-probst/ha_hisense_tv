@@ -26,101 +26,111 @@ async def async_setup_webos_compatibility(hass: HomeAssistant, get_entity_func):
 
     async def async_webostv_button_wrapper(call: ServiceCall):
         """Handles webostv.button and wraps it to the Hisense entity."""
-        button_pressed = call.data.get("button")
-        target_entity_id = call.data.get(ATTR_ENTITY_ID)
-        _LOGGER.debug("webOS button wrapper called for button: %s", button_pressed)
+        target_entity_ids = call.data.get(ATTR_ENTITY_ID)
+        if isinstance(target_entity_ids, str):
+            target_entity_ids = [target_entity_ids]
 
-        if not button_pressed or not target_entity_id:
-            return
+        for entity_id in target_entity_ids or []:
+            button_pressed = call.data.get("button")
+            _LOGGER.debug("webOS button wrapper called for button: %s on entity: %s", button_pressed, entity_id)
 
-        media_player = get_entity_func(target_entity_id)
-        if not media_player:
-            return
+            if not button_pressed:
+                continue
 
-        key_map = {
-            "LANGUAGE": "LANG", "GUIDE": "EPG", "BACK": "RETURNS",
-            "ENTER": "OK", "CENTER": "OK", "VOLUME_UP": "VOLUMEUP",
-            "VOLUME_DOWN": "VOLUMEDOWN", "CAPTIONS": "SUBTITLE", "CC": "SUBTITLE",
-        }
-        hisense_key = key_map.get(button_pressed.upper(), button_pressed.upper())
-        await media_player.async_send_key(hisense_key)
+            media_player = get_entity_func(entity_id)
+            if not media_player:
+                continue
+
+            key_map = {
+                "LANGUAGE": "LANG", "GUIDE": "EPG", "BACK": "RETURNS",
+                "ENTER": "OK", "CENTER": "OK", "VOLUME_UP": "VOLUMEUP",
+                "VOLUME_DOWN": "VOLUMEDOWN", "CAPTIONS": "SUBTITLE", "CC": "SUBTITLE",
+            }
+            hisense_key = key_map.get(button_pressed.upper(), button_pressed.upper())
+            await media_player.async_send_key(hisense_key)
 
     async def async_webostv_launch_wrapper(call: ServiceCall):
         """Handles webostv.launch and wraps it to the Hisense entity."""
-        app_id = call.data.get("app_id")
-        target_entity_id = call.data.get(ATTR_ENTITY_ID)
-        _LOGGER.debug("webOS launch wrapper called for app_id: %s", app_id)
+        target_entity_ids = call.data.get(ATTR_ENTITY_ID)
+        if isinstance(target_entity_ids, str):
+            target_entity_ids = [target_entity_ids]
 
-        if not app_id or not target_entity_id:
-            return
+        for entity_id in target_entity_ids or []:
+            app_id = call.data.get("app_id")
+            _LOGGER.debug("webOS launch wrapper called for app_id: %s on entity: %s", app_id, entity_id)
 
-        media_player = get_entity_func(target_entity_id)
-        if media_player:
-            await media_player.async_launch_app(app_id.capitalize())
+            if not app_id:
+                continue
+
+            media_player = get_entity_func(entity_id)
+            if media_player:
+                await media_player.async_launch_app(app_id.capitalize())
 
     async def async_webostv_command_wrapper(call: ServiceCall):
         """Handles webostv.command (for keyboard, media controls) and wraps it."""
-        _LOGGER.debug("webOS command wrapper called with data: %s", call.data)
-        target_entity_id = call.data.get(ATTR_ENTITY_ID)
-        if not target_entity_id:
-            return
+        target_entity_ids = call.data.get(ATTR_ENTITY_ID)
+        if isinstance(target_entity_ids, str):
+            target_entity_ids = [target_entity_ids]
 
-        media_player = get_entity_func(target_entity_id)
-        if not media_player:
-            return
+        for entity_id in target_entity_ids or []:
+            _LOGGER.debug("webOS command wrapper called with data: %s for entity: %s", call.data, entity_id)
 
-        # Ensure 'command' is a string, as some cards might send it as a list with one element.
-        command = call.data.get("command")
-        if isinstance(command, list) and len(command) == 1:
-            command = command[0]
-        payload = call.data.get("payload", {})
-        text_to_send = payload.get("text")
+            media_player = get_entity_func(entity_id)
+            if not media_player:
+                continue
 
-        # Case 1: Handle text input from keyboard
-        if text_to_send is not None:
-            if target_entity_id not in last_webostv_text:
-                initial_text = getattr(media_player, '_input_text', None) or ""
-                last_webostv_text[target_entity_id] = initial_text
-            old_text = last_webostv_text.get(target_entity_id, "")
+            # Ensure 'command' is a string, as some cards might send it as a list with one element.
+            command = call.data.get("command")
+            if isinstance(command, list) and len(command) == 1:
+                command = command[0]
+            payload = call.data.get("payload", {})
+            text_to_send = payload.get("text")
 
-            common_prefix_len = 0
-            while common_prefix_len < len(old_text) and common_prefix_len < len(text_to_send) and old_text[common_prefix_len] == text_to_send[common_prefix_len]:
-                common_prefix_len += 1
+            # Case 1: Handle text input from keyboard
+            if text_to_send is not None:
+                if entity_id not in last_webostv_text:
+                    initial_text = getattr(media_player, '_input_text', None) or ""
+                    last_webostv_text[entity_id] = initial_text
+                old_text = last_webostv_text.get(entity_id, "")
 
-            backspaces_needed = len(old_text) - common_prefix_len
-            text_to_append = text_to_send[common_prefix_len:]
-            final_text_to_send = ("\b" * backspaces_needed) + text_to_append
+                common_prefix_len = 0
+                while common_prefix_len < len(old_text) and common_prefix_len < len(text_to_send) and old_text[common_prefix_len] == text_to_send[common_prefix_len]:
+                    common_prefix_len += 1
 
-            await media_player.async_send_text(final_text_to_send)
-            last_webostv_text[target_entity_id] = text_to_send
-            return
+                backspaces_needed = len(old_text) - common_prefix_len
+                text_to_append = text_to_send[common_prefix_len:]
+                final_text_to_send = ("\b" * backspaces_needed) + text_to_append
 
-        # Case 2: Handle pre-filling of the text input field
-        elif command == "system.launcher/getForegroundAppInfo":
-            if hasattr(media_player, '_input_text'):
-                hass.bus.async_fire(f"webostv_response_{target_entity_id.replace('.', '_')}", {"payload": {"text": media_player._input_text}})
-            return
+                await media_player.async_send_text(final_text_to_send)
+                last_webostv_text[entity_id] = text_to_send
+                continue
 
-        # Case 3: Handle generic commands (media controls, etc.)
-        elif command:
-            _LOGGER.debug("Processing generic command: %s (type: %s)", command, type(command))
-            command_map = {
-                "media.controls/stop": "STOP", "media.controls/play": "PLAY",
-                "media.controls/pause": "PAUSE", "media.controls/rewind": "BACK",
-                "media.controls/fastForward": "FORWARDS",
-                "com.webos.service.ime/deleteCharacters": "BACKSPACE",
-                "com.webos.service.ime/sendEnterKey": "LIT_ENTER_SPECIAL",
-            }
-            hisense_key = command_map.get(command)
-            if hisense_key:
-                if hisense_key == "LIT_ENTER_SPECIAL":
-                    last_webostv_text.pop(target_entity_id, None)
-                    await media_player.async_send_text("\n")
-                else:
-                    await media_player.async_send_key(hisense_key)
-                    if hisense_key == "BACKSPACE":
-                        old_text = last_webostv_text.get(target_entity_id, "")
-                        last_webostv_text[target_entity_id] = old_text[:-1]
+            # Case 2: Handle pre-filling of the text input field
+            elif command == "system.launcher/getForegroundAppInfo":
+                if hasattr(media_player, '_input_text'):
+                    hass.bus.async_fire(f"webostv_response_{entity_id.replace('.', '_')}", {"payload": {"text": media_player._input_text}})
+                continue
+
+            # Case 3: Handle generic commands (media controls, etc.)
+            elif command:
+                _LOGGER.debug("Processing generic command: %s (type: %s)", command, type(command))
+                command_map = {
+                    "media.controls/stop": "STOP", "media.controls/play": "PLAY",
+                    "media.controls/pause": "PAUSE", "media.controls/rewind": "BACK",
+                    "media.controls/fastForward": "FORWARDS",
+                    "com.webos.service.ime/deleteCharacters": "BACKSPACE",
+                    "com.webos.service.ime/sendEnterKey": "LIT_ENTER_SPECIAL",
+                }
+                hisense_key = command_map.get(command)
+                if hisense_key:
+                    if hisense_key == "LIT_ENTER_SPECIAL":
+                        last_webostv_text.pop(entity_id, None)
+                        await media_player.async_send_text("\n")
+                    else:
+                        await media_player.async_send_key(hisense_key)
+                        if hisense_key == "BACKSPACE":
+                            old_text = last_webostv_text.get(entity_id, "")
+                            last_webostv_text[entity_id] = old_text[:-1]
 
     _LOGGER.debug("Registering webOS compatibility services.")
     hass.services.async_register(
