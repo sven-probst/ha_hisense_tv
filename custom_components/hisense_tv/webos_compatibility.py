@@ -69,7 +69,10 @@ async def async_setup_webos_compatibility(hass: HomeAssistant, get_entity_func):
         if not media_player:
             return
 
+        # Ensure 'command' is a string, as some cards might send it as a list with one element.
         command = call.data.get("command")
+        if isinstance(command, list) and len(command) == 1:
+            command = command[0]
         payload = call.data.get("payload", {})
         text_to_send = payload.get("text")
 
@@ -100,6 +103,7 @@ async def async_setup_webos_compatibility(hass: HomeAssistant, get_entity_func):
 
         # Case 3: Handle generic commands (media controls, etc.)
         elif command:
+            _LOGGER.debug("Processing generic command: %s (type: %s)", command, type(command))
             command_map = {
                 "media.controls/stop": "STOP", "media.controls/play": "PLAY",
                 "media.controls/pause": "PAUSE", "media.controls/rewind": "BACK",
