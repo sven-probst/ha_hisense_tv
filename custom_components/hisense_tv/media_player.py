@@ -49,6 +49,8 @@ REQUIREMENTS = []
 
 _LOGGER = logging.getLogger(__name__) 
 
+TURN_OFF_RETRY_DELAY = 4
+
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_MAC): cv.string,
@@ -173,6 +175,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._pending_poll_response = False
         self._missed_polls = 0
         self._input_text = None  # store "bwsinputdata"
+        self._turn_off_retry_task = None
 
         self._sourcelist_requested = False
 
@@ -292,16 +295,26 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             _LOGGER.debug("TV is already off or in standby. Doing nothing.")
             return
 
+        self._cancel_turn_off_retry()
         _LOGGER.debug("Sending KEY_POWER to turn off TV.")
+        await self._async_send_power_key()
+        self._set_optimistic_standby()
+        self._turn_off_retry_task = self._hass.async_create_task(
+            self._async_retry_turn_off()
+        )
+
+    async def _async_send_power_key(self):
+        """Send the power key to the TV."""
         await mqtt.async_publish(
             hass=self._hass,
             topic=self._out_topic("/remoteapp/tv/remote_service/%s/actions/sendkey"),
             payload="KEY_POWER",
             retain=False,
         )
-        # Optimistically set the state to standby and update HA.
+
+    def _set_optimistic_standby(self):
+        """Set standby while waiting for the TV to confirm power off."""
         self._state = STATE_STANDBY
-        # Clear media-related attributes for a clean UI
         self._title = None
         self._channel_name = None
         self._channel_num = None
@@ -309,6 +322,31 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._endtime = None
         self._position = None
         self.async_write_ha_state()
+
+    async def _async_retry_turn_off(self):
+        """Retry once when the TV reports that it is still playing."""
+        try:
+            await asyncio.sleep(TURN_OFF_RETRY_DELAY)
+            if self._state != STATE_PLAYING:
+                return
+
+            _LOGGER.warning(
+                "TV still reports playing after KEY_POWER. Retrying once."
+            )
+            await self._async_send_power_key()
+            self._set_optimistic_standby()
+        except asyncio.CancelledError:
+            return
+        finally:
+            if self._turn_off_retry_task is asyncio.current_task():
+                self._turn_off_retry_task = None
+
+    def _cancel_turn_off_retry(self):
+        """Cancel a pending power-off retry."""
+        task = self._turn_off_retry_task
+        self._turn_off_retry_task = None
+        if task and task is not asyncio.current_task():
+            task.cancel()
 
     @property
     def is_volume_muted(self):
@@ -468,6 +506,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             await self.async_launch_app(source)
 
     async def async_will_remove_from_hass(self):
+        self._cancel_turn_off_retry()
         for unsubscribe in list(self._subscriptions.values()):
             unsubscribe()
 
@@ -524,6 +563,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def _message_received_turnoff(self, msg):
         """Run when new MQTT message has been received."""
+        self._cancel_turn_off_retry()
         self._pending_poll_response = False
         _LOGGER.debug("message_received_turnoff: TV is entering standby or deep sleep.")
         self._sourcelist_requested = False  # Reset flag when TV turns off
