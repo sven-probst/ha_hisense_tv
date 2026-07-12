@@ -101,9 +101,16 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
     name = config_entry.data[CONF_NAME]
     mac = config_entry.data[CONF_MAC]
-    ip_address = config_entry.data.get(CONF_IP_ADDRESS, wakeonlan.BROADCAST_IP)
-    mqtt_in = config_entry.data[CONF_MQTT_IN]
-    mqtt_out = config_entry.data[CONF_MQTT_OUT]
+    ip_address = config_entry.options.get(
+        CONF_IP_ADDRESS,
+        config_entry.data.get(CONF_IP_ADDRESS, wakeonlan.BROADCAST_IP),
+    )
+    mqtt_in = config_entry.options.get(
+        CONF_MQTT_IN, config_entry.data[CONF_MQTT_IN]
+    )
+    mqtt_out = config_entry.options.get(
+        CONF_MQTT_OUT, config_entry.data[CONF_MQTT_OUT]
+    )
     uid = config_entry.unique_id
     key_delay = config_entry.options.get(CONF_KEY_DELAY, 0.2)
     if uid is None:
