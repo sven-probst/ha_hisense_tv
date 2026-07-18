@@ -68,8 +68,11 @@ class HisenseTvBase(object):
         self._subscriptions = {
             "tvsleep": lambda: None,
             "state": lambda: None,
+            "hotelmode": lambda: None,
             "volume": lambda: None,
             "sourcelist": lambda: None,
+            "inputdata": lambda: None,
+            "token_refresh": lambda: None,
         }
 
     def _out_topic(self, topic=""):

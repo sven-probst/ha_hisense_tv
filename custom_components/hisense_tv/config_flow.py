@@ -22,6 +22,7 @@ from .const import (
     CONF_MQTT_IN,
     CONF_KEY_DELAY,
     CONF_MQTT_OUT,
+    CONF_TOKEN,
     DEFAULT_CLIENT_ID,
     DEFAULT_MQTT_PREFIX,
     DEFAULT_NAME,
@@ -130,7 +131,7 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "manufacturer": "Hisense",
             "model": device_details.get("modelName"),
             "name": friendly_name,
-            "sw_version": device_details.get("firmware"), # Assuming firmware is in the spec
+            "sw_version": device_details.get("firmware"),
         }
 
         return await self.async_step_user()
@@ -176,83 +177,115 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data = dict(entry.data)
             self.unique_id = entry.unique_id
 
-        return await self.async_step_check_auth()
+        # For reauth, directly go to PIN entry
+        return await self.async_step_auth()
 
     async def async_step_check_auth(self, user_input=None):
         """Check if TV is already authenticated or needs a PIN."""
-        queue = asyncio.Queue()
-
-        async def auth_needed_callback(msg):
-            await queue.put("auth_needed")
-
-        async def auth_ok_callback(msg):
-            await queue.put("auth_ok")
-
+        _LOGGER.debug("Checking if TV needs authentication")
+        
         mqtt_in = self._data[CONF_MQTT_IN]
         mqtt_out = self._data[CONF_MQTT_OUT]
 
-        # Subscribe to topics that indicate auth status
+        # Subscribe to the 'authentication' topic to detect if TV needs auth
+        queue = asyncio.Queue()
+        
+        async def auth_needed_callback(msg):
+            try:
+                payload = json.loads(msg.payload)
+                _LOGGER.debug("Auth needed signal: %s", payload)
+                await queue.put("auth_needed")
+            except (JSONDecodeError, AttributeError):
+                pass
+
+        # Subscribe to topics that indicate the TV is already authorized
+        async def auth_ok_callback(msg):
+            _LOGGER.debug("TV responded - auth seems OK: %s", msg.topic)
+            await queue.put("auth_ok")
+
+        # Subscribe to various response topics to detect if auth is needed
         unsub_needed = await mqtt.async_subscribe(
-            self.hass, f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/authentication", auth_needed_callback
+            self.hass,
+            f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/authentication",
+            auth_needed_callback,
         )
-        unsub_ok = await mqtt.async_subscribe(
-            self.hass, f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/sourcelist", auth_ok_callback
+        unsub_sourcelist = await mqtt.async_subscribe(
+            self.hass,
+            f"{mqtt_out}/remoteapp/mobile/{self._client_id}/ui_service/data/sourcelist",
+            auth_ok_callback,
         )
-        # Also subscribe to the general state topic as a fallback for "auth_ok"
         unsub_state = await mqtt.async_subscribe(
-            self.hass, f"{mqtt_in}/remoteapp/mobile/broadcast/ui_service/state", auth_ok_callback
+            self.hass,
+            f"{mqtt_in}/remoteapp/mobile/broadcast/ui_service/state",
+            auth_ok_callback,
+        )
+        unsub_hotelmode = await mqtt.async_subscribe(
+            self.hass,
+            f"{mqtt_in}/remoteapp/mobile/broadcast/ui_service/data/hotelmodechange",
+            auth_ok_callback,
         )
 
         try:
-            # Publish message to trigger an auth response
+            # Publish gettvstate to trigger a response from the TV
             await mqtt.async_publish(
-                self.hass, f"{mqtt_out}/remoteapp/tv/ui_service/{self._client_id}/actions/gettvstate", ""
+                self.hass,
+                f"{mqtt_out}/remoteapp/tv/ui_service/{self._client_id}/actions/gettvstate",
+                "",
             )
 
-            # Wait for a response
+            # Wait for response (up to 10 seconds)
             result = await asyncio.wait_for(queue.get(), timeout=10)
 
             if result == "auth_needed":
                 return await self.async_step_auth()
-            if result == "auth_ok":
-                return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
+
+            # auth_ok -> create entry directly (no PIN needed)
+            return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
 
         except asyncio.TimeoutError:
+            # No response at all - TV might be off or unreachable
+            _LOGGER.warning("No response from TV during auth check")
             return self.async_abort(reason="auth_timeout")
         finally:
             unsub_needed()
-            unsub_ok()
+            unsub_sourcelist()
             unsub_state()
-
-        return self.async_abort(reason="cannot_connect")
+            unsub_hotelmode()
 
     async def async_step_auth(self, user_input=None):
-        """Auth handler."""
+        """Auth handler - enter PIN displayed on TV."""
         errors = {}
         if user_input is not None:
+            mqtt_in = self._data[CONF_MQTT_IN]
+            mqtt_out = self._data[CONF_MQTT_OUT]
+
+            # Subscribe to authentication result
             queue = asyncio.Queue()
 
             async def auth_response_callback(msg):
                 try:
                     payload = json.loads(msg.payload)
+                    _LOGGER.debug("Auth response: %s", payload)
+                    # TV sends 'result: 1' on successful auth
                     await queue.put(payload.get("result") == 1)
                 except (JSONDecodeError, AttributeError):
                     await queue.put(False)
 
-            mqtt_in = self._data[CONF_MQTT_IN]
-            mqtt_out = self._data[CONF_MQTT_OUT]
-
             unsub = await mqtt.async_subscribe(
-                self.hass, f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/authenticationcode", auth_response_callback
+                self.hass,
+                f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/authenticationcode",
+                auth_response_callback
             )
-
             try:
-                payload = json.dumps({"authNum": user_input[CONF_PIN]})
+                # Send the PIN entered by the user to the TV
+                payload = json.dumps({"authNum": str(user_input[CONF_PIN])})
                 await mqtt.async_publish(
-                    self.hass, f"{mqtt_out}/remoteapp/tv/ui_service/{self._client_id}/actions/authenticationcode", payload
+                    self.hass,
+                    f"{mqtt_out}/remoteapp/tv/ui_service/{self._client_id}/actions/authenticationcode",
+                    payload
                 )
 
-                if await asyncio.wait_for(queue.get(), timeout=10):
+                if await asyncio.wait_for(queue.get(), timeout=15):
                     return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
                 
                 errors["base"] = "invalid_auth"
@@ -264,17 +297,8 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="auth",
-            data_schema=vol.Schema({vol.Required(CONF_PIN): int}),
+            data_schema=vol.Schema({vol.Required(CONF_PIN): str}),
             errors=errors,
-        )
-
-    async def async_step_finish(self, user_input=None):
-        """Finish config flow."""
-        _LOGGER.debug("async_step_finish")
-        _LOGGER.debug("async_step_finish with context: %s", self.context)
-
-        return self.async_create_entry(
-            title=self._data[CONF_NAME], data=self._data
         )
 
     async def async_step_import(self, data):
@@ -293,7 +317,6 @@ class HisenseTvOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         """Manage the options."""
         if user_input is not None:
-            # Create a new dict with updated options, preserving the original data
             self.hass.config_entries.async_update_entry(
                 self.config_entry, data=self.config_entry.data, options=user_input
             )
@@ -321,3 +344,4 @@ class HisenseTvOptionsFlow(config_entries.OptionsFlow):
         )
 
         return self.async_show_form(step_id="init", data_schema=options_schema, last_step=True)
+

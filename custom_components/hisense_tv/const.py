@@ -12,6 +12,12 @@ DEFAULT_NAME = "Hisense TV"
 DEFAULT_KEY_DELAY = 0.4
 DOMAIN = "hisense_tv"
 
+# Token & Authentication
+CONF_TOKEN = "auth_token"
+CONF_DEVICE_ID = "device_id"
+TOKEN_VALIDITY_HOURS = 24
+TOKEN_REFRESH_BUFFER_HOURS = 1
+
 # Discovery
 SSDP_ST = "urn:schemas-upnp-org:device:MediaRenderer:1"
 

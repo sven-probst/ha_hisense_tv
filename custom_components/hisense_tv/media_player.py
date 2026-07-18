@@ -34,16 +34,20 @@ from homeassistant.const import (
 ) 
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_registry as er
+from homeassistant.helpers.event import async_track_time_interval
 
 from .const import (
     ATTR_CODE,
     CONF_MQTT_IN,
     CONF_MQTT_OUT,
+    CONF_TOKEN,
     DEFAULT_NAME,
+    DEFAULT_CLIENT_ID,
     DOMAIN,
     CONF_KEY_DELAY,
 )
 from .helper import HisenseTvBase, mqtt_pub_sub
+from .auth_manager import HisenseAuthManager
 
 REQUIREMENTS = []
 
@@ -116,6 +120,9 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     if uid is None:
         uid = config_entry.entry_id
 
+    # Get stored token data if available
+    stored_token = config_entry.data.get(CONF_TOKEN)
+
     entity = HisenseTvEntity(
         hass=hass,
         name=name,
@@ -125,6 +132,8 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         uid=uid,
         ip_address=ip_address,
         key_delay=key_delay,
+        config_entry=config_entry,
+        stored_token=stored_token,
     )
     async_add_entities([entity])
 
@@ -142,6 +151,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         uid: str,
         ip_address: str,
         key_delay: float,
+        config_entry=None,
+        stored_token=None,
     ):
         super().__init__(
             hass=hass,
@@ -161,6 +172,17 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._attr_unique_id = uid
         self._volume = 0
         self._state = STATE_OFF
+        
+        # Initialize auth manager
+        self._config_entry = config_entry
+        self._auth_manager = HisenseAuthManager(
+            hass=hass,
+            client_id=DEFAULT_CLIENT_ID,
+            mqtt_in=mqtt_in,
+            mqtt_out=mqtt_out,
+            mac_address=mac,
+            stored_token=stored_token,
+        )
         # Request sourcelist on init if TV is already on 
         self._hass.async_create_task(self._check_tv_state())
 
@@ -517,10 +539,48 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         for unsubscribe in list(self._subscriptions.values()):
             unsubscribe()
 
+    async def _save_token_to_config_entry(self):
+        """Save the auth token to the config entry for persistence."""
+        if self._config_entry and self._auth_manager:
+            token_dict = self._auth_manager.get_token_dict()
+            if token_dict:
+                _LOGGER.debug("Saving auth token to config entry")
+                new_data = dict(self._config_entry.data)
+                new_data[CONF_TOKEN] = token_dict
+                self._hass.config_entries.async_update_entry(
+                    self._config_entry, data=new_data
+                )
+            else:
+                _LOGGER.debug("No token to save to config entry")
+
+    async def _async_refresh_token_if_needed(self, _now):
+        """Periodically check and refresh the auth token if needed."""
+        if self._auth_manager and self._auth_manager.current_token and self._auth_manager.current_token.needs_refresh:
+            _LOGGER.debug("Token needs refresh, attempting to refresh")
+            if await self._auth_manager.ensure_authenticated():
+                await self._save_token_to_config_entry()
+                _LOGGER.info("Token refreshed successfully")
+            else:
+                _LOGGER.warning("Failed to refresh token")
+
     async def async_added_to_hass(self):
         """Subscribe to MQTT events."""
-        # Remove the check for self._state and _request_sourcelist here
-        # ...existing code...
+        # Perform initial authentication with the TV
+        _LOGGER.debug("Performing initial authentication with TV")
+        auth_success = await self._auth_manager.ensure_authenticated()
+        if auth_success:
+            _LOGGER.info("Successfully authenticated with TV")
+            # Send login info to establish session
+            await self._auth_manager.send_login_info()
+            # Save token to config entry for persistence
+            await self._save_token_to_config_entry()
+        else:
+            _LOGGER.warning("Initial authentication with TV failed - continuing without token auth")
+
+        # Set up periodic token refresh check (every 30 minutes)
+        self._subscriptions["token_refresh"] = async_track_time_interval(
+            self._hass, self._async_refresh_token_if_needed, timedelta(minutes=30)
+        )
 
         self._subscriptions["tvsleep"] = await mqtt.async_subscribe(
             self._hass,
@@ -1159,3 +1219,4 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             payload=payload,
             retain=False,
         )
+
