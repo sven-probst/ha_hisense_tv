@@ -5,6 +5,7 @@ from json.decoder import JSONDecodeError
 import logging
 import re
 import xml.etree.ElementTree as ET
+import hashlib
 
 import aiohttp
 import voluptuous as vol
@@ -187,7 +188,7 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
         mqtt_in = self._data[CONF_MQTT_IN]
         mqtt_out = self._data[CONF_MQTT_OUT]
 
-        # Subscribe to the 'authentication' topic to detect if TV needs auth
+        # Subscribe to topics to detect authentication state
         queue = asyncio.Queue()
         
         async def auth_needed_callback(msg):
@@ -195,6 +196,20 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 payload = json.loads(msg.payload)
                 _LOGGER.debug("Auth needed signal: %s", payload)
                 await queue.put("auth_needed")
+            except (JSONDecodeError, AttributeError):
+                pass
+
+        # Listen for vidaa_app_connect response (main auth handshake)
+        async def vidaa_connect_callback(msg):
+            try:
+                payload = json.loads(msg.payload)
+                connect_result = payload.get("connect_result")
+                _LOGGER.debug("vidaa_app_connect response: %s", payload)
+                if connect_result == 1:
+                    await queue.put("auth_ok")
+                elif connect_result == 0:
+                    # TV needs PIN authentication
+                    await queue.put("auth_needed")
             except (JSONDecodeError, AttributeError):
                 pass
 
@@ -209,9 +224,21 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
             f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/authentication",
             auth_needed_callback,
         )
+        # Also listen for the vidaa_app_connect response
+        unsub_vidaa_connect = await mqtt.async_subscribe(
+            self.hass,
+            f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/vidaa_app_connect",
+            vidaa_connect_callback,
+        )
+        # Listen for authenticationcodetoast (TV may broadcast PIN display status)
+        unsub_auth_toast = await mqtt.async_subscribe(
+            self.hass,
+            f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/authenticationcodetoast",
+            auth_needed_callback,
+            )
         unsub_sourcelist = await mqtt.async_subscribe(
             self.hass,
-            f"{mqtt_out}/remoteapp/mobile/{self._client_id}/ui_service/data/sourcelist",
+            f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/sourcelist",
             auth_ok_callback,
         )
         unsub_state = await mqtt.async_subscribe(
@@ -226,7 +253,22 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
         try:
-            # Publish gettvstate to trigger a response from the TV
+            # First, send vidaa_app_connect to establish a session with the TV
+            # (mimicking the official VIDAA app behavior)
+            connect_payload = json.dumps({
+                "app_version": 2,
+                "device_type": "Mobile App",
+                "device_id": hashlib.sha256(f"HisenseTV_{self.unique_id or self._mac_address or 'HomeAssistant'}".encode()).hexdigest()[:32],
+                "mac_address": self.unique_id or self._mac_address or "",
+            })
+            await mqtt.async_publish(
+                self.hass,
+                f"{mqtt_out}/remoteapp/tv/ui_service/{self._client_id}/actions/vidaa_app_connect",
+                connect_payload,
+            )
+            _LOGGER.debug("Sent vidaa_app_connect to initiate TV handshake")
+
+            # Also publish gettvstate to trigger a response from the TV
             await mqtt.async_publish(
                 self.hass,
                 f"{mqtt_out}/remoteapp/tv/ui_service/{self._client_id}/actions/gettvstate",
@@ -248,6 +290,8 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="auth_timeout")
         finally:
             unsub_needed()
+            unsub_vidaa_connect()
+            unsub_auth_toast()
             unsub_sourcelist()
             unsub_state()
             unsub_hotelmode()
@@ -283,7 +327,7 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     self.hass,
                     f"{mqtt_out}/remoteapp/tv/ui_service/{self._client_id}/actions/authenticationcode",
                     payload
-                )
+        )
 
                 if await asyncio.wait_for(queue.get(), timeout=15):
                     return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)

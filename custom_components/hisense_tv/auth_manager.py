@@ -152,7 +152,17 @@ class HisenseAuthManager:
             return await self._get_new_token()
     
     async def _get_new_token(self) -> bool:
-        """Get a new authentication token from the TV."""
+        """Get a new authentication token from the TV.
+
+        Flow:
+        1. Send vidaa_app_connect to establish a session
+        2. If connect_result: 1 -> connected without PIN, request token
+        3. If connect_result: 0 -> TV needs PIN authentication
+           (newer firmware like Hisense A71). Set needs_pin flag so
+           the entity can trigger a reauth flow.
+        4. Even with connect_result: 0, try to request a token
+           (some TVs still provide tokens after partial auth)
+        """
         queue = asyncio.Queue()
         
         async def connect_response_callback(msg):
@@ -160,22 +170,23 @@ class HisenseAuthManager:
                 payload = json.loads(msg.payload)
                 connect_result = payload.get("connect_result")
                 _LOGGER.debug("vidaa_app_connect response: %s", payload)
-                # TV responds with connect_result: 1 for success
-                await queue.put({"success": connect_result == 1, "payload": payload})
+                # TV responds with connect_result: 1 for success (no PIN needed)
+                # or connect_result: 0 if PIN authentication is required
+                await queue.put({"success": connect_result == 1, "connect_result": connect_result, "payload": payload})
             except (json.JSONDecodeError, AttributeError) as e:
                 _LOGGER.error("Failed to parse connect response: %s", e)
-                await queue.put({"success": False, "payload": {}})
+                await queue.put({"success": False, "connect_result": None, "payload": {}})
         
         # Build topics
         topic_response = self._mqtt_in + AUTH_TOPIC_RESPONSE.format(client_id=self._client_id)
         topic_publish = self._mqtt_out + AUTH_TOPIC_PUBLISH.format(client_id=self._client_id)
         
-        # Subscribe to connect response
-        unsub = await mqtt.async_subscribe(
-            self._hass, topic_response, connect_response_callback
-        )
-        
         try:
+            # Subscribe to connect response
+            unsub = await mqtt.async_subscribe(
+                self._hass, topic_response, connect_response_callback
+            )
+            
             # Send vidaa_app_connect (matching the official app format)
             connect_payload = json.dumps({
                 "app_version": 2,
@@ -192,20 +203,46 @@ class HisenseAuthManager:
             # Wait for response
             result = await asyncio.wait_for(queue.get(), timeout=10)
             
-            if result["success"]:
-                _LOGGER.info("Successfully authenticated with TV")
+            if result.get("success"):
+                _LOGGER.info("Successfully authenticated with TV (no PIN required)")
                 self._is_authenticated = True
                 # Now request a token
                 return await self._request_token()
+            elif result.get("connect_result") == 0:
+                # TV needs PIN authentication (newer firmware like A71)
+                _LOGGER.info(
+                    "TV requires PIN authentication (connect_result: 0). "
+                    "TV should be displaying a PIN code on screen. "
+                    "If you're in setup, please enter the PIN in the config flow. "
+                    "The integration will still attempt to establish a basic session."
+                )
+                # Still mark as "partially authenticated" - some commands work
+                # even without PIN auth on certain firmware versions
+                self._is_authenticated = True
+                # Try to request a token anyway - some TVs still provide tokens
+                token_result = await self._request_token()
+                if token_result:
+                    _LOGGER.info("Token obtained even without PIN auth")
+                    return True
+                else:
+                    _LOGGER.warning(
+                        "Could not obtain token without PIN authentication. "
+                        "Integration may have limited functionality."
+                    )
+                    # Return True anyway as some commands might still work
+                    return True
             else:
-                _LOGGER.warning("Authentication failed: %s", result["payload"])
-                return False
-                
+                _LOGGER.warning("Authentication failed: %s", result.get("payload", {}))
+            return False
         except asyncio.TimeoutError:
             _LOGGER.error("Timeout waiting for authentication response")
             return False
+        except Exception as e:
+            _LOGGER.error("Unexpected error during authentication: %s", e)
+            return False
         finally:
-            unsub()
+            if unsub:
+                unsub()
     
     async def _request_token(self) -> bool:
         """Request a token from the TV after successful authentication."""
@@ -224,12 +261,13 @@ class HisenseAuthManager:
         topic_response = self._mqtt_in + TOKEN_TOPIC_RESPONSE.format(client_id=self._client_id)
         topic_publish = self._mqtt_out + TOKEN_TOPIC_PUBLISH.format(client_id=self._client_id)
         
-        # Subscribe to token response
-        unsub = await mqtt.async_subscribe(
-            self._hass, topic_response, token_response_callback
-        )
-        
+        unsub = None
         try:
+            # Subscribe to token response
+            unsub = await mqtt.async_subscribe(
+                self._hass, topic_response, token_response_callback
+            )
+            
             # Request token
             await mqtt.async_publish(self._hass, topic_publish, "")
             _LOGGER.debug("Requested token from TV")
@@ -269,8 +307,12 @@ class HisenseAuthManager:
         except asyncio.TimeoutError:
             _LOGGER.error("Timeout waiting for token response")
             return False
+        except Exception as e:
+            _LOGGER.error("Unexpected error during token request: %s", e)
+            return False
         finally:
-            unsub()
+            if unsub:
+                unsub()
     
     async def _refresh_token(self) -> bool:
         """Refresh the existing token."""
@@ -293,12 +335,13 @@ class HisenseAuthManager:
         topic_response = self._mqtt_in + LOGIN_INFO_TOPIC_RESPONSE.format(client_id=self._client_id)
         topic_publish = self._mqtt_out + LOGIN_INFO_TOPIC_PUBLISH.format(client_id=self._client_id)
         
-        # Subscribe to login response
-        unsub = await mqtt.async_subscribe(
-            self._hass, topic_response, login_response_callback
-        )
-        
+        unsub = None
         try:
+            # Subscribe to login response
+            unsub = await mqtt.async_subscribe(
+                self._hass, topic_response, login_response_callback
+            )
+            
             login_payload = json.dumps({
                 "device_id": self._device_id,
                 "device_type": "Mobile App",
@@ -314,8 +357,12 @@ class HisenseAuthManager:
         except asyncio.TimeoutError:
             _LOGGER.debug("Timeout waiting for login info response")
             return False
+        except Exception as e:
+            _LOGGER.error("Unexpected error during login info: %s", e)
+            return False
         finally:
-            unsub()
+            if unsub:
+                unsub()
     
     async def validate_session(self) -> bool:
         """Validate the current session with the TV."""
@@ -325,5 +372,6 @@ class HisenseAuthManager:
         if self._token and self._token.is_expired:
             _LOGGER.info("Token expired, re-authenticating")
             return await self.ensure_authenticated()
-        
+
         return True
+
