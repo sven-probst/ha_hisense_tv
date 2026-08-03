@@ -129,6 +129,14 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             self._message_received_picturesetting_broadcast,
         )
 
+        # Request current TV state to become available immediately if TV is on
+        await mqtt.async_publish(
+            hass=self._hass,
+            topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/gettvstate"),
+            payload="",
+            retain=False,
+        )
+
     async def _message_received_turnoff(self, msg):
         _LOGGER.debug("message_received_turnoff")
         self._is_available = False
@@ -286,6 +294,17 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         }
 
     async def async_update(self):
-        """Update is handled by MQTT subscriptions, not polling. But we can request an update."""
+        """Request TV state update to keep sensor data fresh."""
         _LOGGER.debug("async_update called for sensor")
-        self._force_trigger = True
+        # Request TV state to trigger availability updates
+        await mqtt.async_publish(
+            hass=self._hass,
+            topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/gettvstate"),
+            payload="",
+            retain=False,
+        )
+
+    @property
+    def should_poll(self):
+        """Enable polling to periodically refresh sensor data."""
+        return True
