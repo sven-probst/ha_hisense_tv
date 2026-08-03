@@ -219,40 +219,47 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
             await queue.put("auth_ok")
 
         # Subscribe to various response topics to detect if auth is needed
-        unsub_needed = await mqtt.async_subscribe(
-            self.hass,
-            f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/authentication",
-            auth_needed_callback,
-        )
-        # Also listen for the vidaa_app_connect response
-        unsub_vidaa_connect = await mqtt.async_subscribe(
-            self.hass,
-            f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/vidaa_app_connect",
-            vidaa_connect_callback,
-        )
-        # Listen for authenticationcodetoast (TV may broadcast PIN display status)
-        unsub_auth_toast = await mqtt.async_subscribe(
-            self.hass,
-            f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/authenticationcodetoast",
-            auth_needed_callback,
-            )
-        unsub_sourcelist = await mqtt.async_subscribe(
-            self.hass,
-            f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/sourcelist",
-            auth_ok_callback,
-        )
-        unsub_state = await mqtt.async_subscribe(
-            self.hass,
-            f"{mqtt_in}/remoteapp/mobile/broadcast/ui_service/state",
-            auth_ok_callback,
-        )
-        unsub_hotelmode = await mqtt.async_subscribe(
-            self.hass,
-            f"{mqtt_in}/remoteapp/mobile/broadcast/ui_service/data/hotelmodechange",
-            auth_ok_callback,
-        )
-
+        # Initialize all unsub variables to None for safe cleanup
+        unsub_needed = None
+        unsub_vidaa_connect = None
+        unsub_auth_toast = None
+        unsub_sourcelist = None
+        unsub_state = None
+        unsub_hotelmode = None
         try:
+            unsub_needed = await mqtt.async_subscribe(
+                self.hass,
+                f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/authentication",
+                auth_needed_callback,
+            )
+            # Also listen for the vidaa_app_connect response
+            unsub_vidaa_connect = await mqtt.async_subscribe(
+                self.hass,
+                f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/vidaa_app_connect",
+                vidaa_connect_callback,
+            )
+            # Listen for authenticationcodetoast (TV may broadcast PIN display status)
+            unsub_auth_toast = await mqtt.async_subscribe(
+                self.hass,
+                f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/authenticationcodetoast",
+                auth_needed_callback,
+                )
+            unsub_sourcelist = await mqtt.async_subscribe(
+                    self.hass,
+                f"{mqtt_in}/remoteapp/mobile/{self._client_id}/ui_service/data/sourcelist",
+                auth_ok_callback,
+        )
+            unsub_state = await mqtt.async_subscribe(
+                self.hass,
+                f"{mqtt_in}/remoteapp/mobile/broadcast/ui_service/state",
+                auth_ok_callback,
+        )
+            unsub_hotelmode = await mqtt.async_subscribe(
+                self.hass,
+                f"{mqtt_in}/remoteapp/mobile/broadcast/ui_service/data/hotelmodechange",
+                auth_ok_callback,
+            )
+
             # First, send vidaa_app_connect to establish a session with the TV
             # (mimicking the official VIDAA app behavior)
             connect_payload = json.dumps({
@@ -288,13 +295,22 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # No response at all - TV might be off or unreachable
             _LOGGER.warning("No response from TV during auth check")
             return self.async_abort(reason="auth_timeout")
+        except Exception as e:
+            _LOGGER.error("Unexpected error during auth check: %s", e)
+            return self.async_abort(reason="unknown_error")
         finally:
-            unsub_needed()
-            unsub_vidaa_connect()
-            unsub_auth_toast()
-            unsub_sourcelist()
-            unsub_state()
-            unsub_hotelmode()
+            if unsub_needed:
+                unsub_needed()
+            if unsub_vidaa_connect:
+                unsub_vidaa_connect()
+            if unsub_auth_toast:
+                unsub_auth_toast()
+            if unsub_sourcelist:
+                unsub_sourcelist()
+            if unsub_state:
+                unsub_state()
+            if unsub_hotelmode:
+                unsub_hotelmode()
 
     async def async_step_auth(self, user_input=None):
         """Auth handler - enter PIN displayed on TV."""
@@ -388,4 +404,5 @@ class HisenseTvOptionsFlow(config_entries.OptionsFlow):
         )
 
         return self.async_show_form(step_id="init", data_schema=options_schema, last_step=True)
+
 
