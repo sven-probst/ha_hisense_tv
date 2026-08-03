@@ -382,13 +382,20 @@ class HisenseTvOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         """Manage the options."""
         if user_input is not None:
+            # Update config data with new MAC so WoL uses the correct address
+            new_data = dict(self.config_entry.data)
+            new_data[CONF_MAC] = user_input[CONF_MAC]
             self.hass.config_entries.async_update_entry(
-                self.config_entry, data=self.config_entry.data, options=user_input
+                self.config_entry, data=new_data, options=user_input
             )
             return self.async_create_entry(title="", data=user_input)
 
         options_schema = vol.Schema(
             {
+                vol.Required(
+                    CONF_MAC,
+                    default=self.config_entry.options.get(CONF_MAC, self.config_entry.data.get(CONF_MAC)),
+                ): str,
                 vol.Optional(
                     CONF_IP_ADDRESS,
                     description={"suggested_value": self.config_entry.options.get(CONF_IP_ADDRESS, self.config_entry.data.get(CONF_IP_ADDRESS))},

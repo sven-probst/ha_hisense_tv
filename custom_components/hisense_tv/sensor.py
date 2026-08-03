@@ -144,8 +144,12 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
 
     async def _message_received_turnon(self, msg):
         _LOGGER.debug("message_received_turnon")
+        # Even retained messages tell us the TV is there, so mark available
+        self._is_available = True
+
         if msg.retain:
-            _LOGGER.debug("message_received_turnon - skip retained message")
+            _LOGGER.debug("message_received_turnon - retained message, marking available")
+            self.async_write_ha_state()
             return
 
         try:
