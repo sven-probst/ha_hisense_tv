@@ -221,6 +221,13 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         return MediaType.TVSHOW
 
     @property
+    def device_info(self):
+        """Return the device info."""
+        return {
+            "identifiers": {(DOMAIN, self._unique_id)},
+        }
+
+    @property
     def device_class(self):
         """Set the device class to TV."""
         _LOGGER.debug("device_class")
