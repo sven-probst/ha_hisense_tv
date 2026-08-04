@@ -295,6 +295,9 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
         # This links the sensor to the main media_player device.
         return {
             "identifiers": {(DOMAIN, self._unique_id)},
+            "name": self._name,
+            "manufacturer": "Hisense",
+            "model": "VIDAA TV",
         }
 
     async def async_update(self):

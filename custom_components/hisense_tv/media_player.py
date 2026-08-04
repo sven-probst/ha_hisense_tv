@@ -225,6 +225,9 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         """Return the device info."""
         return {
             "identifiers": {(DOMAIN, self._unique_id)},
+            "name": self._name,
+            "manufacturer": "Hisense",
+            "model": "VIDAA TV",
         }
 
     @property
