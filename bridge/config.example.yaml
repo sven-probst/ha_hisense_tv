@@ -1,0 +1,38 @@
+# Configuration for the dynamic Hisense/VIDAA MQTT bridge.
+# Replaces the static Mosquitto bridge for TVs that now require
+# timestamp-based authentication (VIDAA 9 / transport_protocol >= 3000).
+
+mqtt:
+  # Home Assistant's MQTT broker
+  host: 127.0.0.1
+  port: 1883
+  username: ""           # optional
+  password: ""           # optional
+  tls: false             # set true if HA broker requires TLS
+  ca_certs:              # optional, for TLS
+  # Shortcut when every TV uses the same prefix as in the HA integration:
+  prefix: hisense
+
+tvs:
+  - name: Wohnzimmer-TV            # only used for logging and the bridge client id
+    host: 192.168.1.50             # replace with the TV's IP address
+    port: 36669
+    mac: "AA:BB:CC:DD:EE:FF"       # optional - auto-detected from the TV descriptor
+    brand: tve                     # optional - auto-detected ("his", "tve", ...)
+    auth_mode: auto                # auto | static | dynamic
+    certfile: /config/certs/vidaa_client.pem   # client certificate (mTLS)
+    keyfile: /config/certs/vidaa_client.key    # client private key (mTLS)
+    ca_certs:                      # optional; TV broker root certificate (RemoteCA)
+    prefix_in: hisense             # prefix used by the HA integration for TV -> HA
+    prefix_out: hisense            # prefix used by the HA integration for HA -> TV
+    topic_client_id: HomeAssistant # client id the HA integration puts in topics
+    keepalive: 20
+
+  # Another TV needs its own unique prefixes and its own entry:
+  # - name: Kinder-TV
+  #   host: 192.168.1.51
+  #   certfile: /config/certs/vidaa_client.pem
+  #   keyfile: /config/certs/vidaa_client.key
+  #   prefix_in: kids_tv
+  #   prefix_out: kids_tv
+  #   topic_client_id: HomeAssistant

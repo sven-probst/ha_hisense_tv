@@ -1,2 +1,9 @@
 __pycache__
 custom_components/hisense_tv/SdkMqttPublishManager.java
+
+# Extracted credentials and downloads (bridge)
+certs/
+bridge/config.yaml
+*.apk
+*.apkm
+*.xapk

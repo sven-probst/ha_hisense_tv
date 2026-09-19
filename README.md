@@ -32,9 +32,14 @@ The TV provides a MQTT broker on port `36669`. Home Assistant can only communica
 
 ## MQTT
 
-The MQTT broker is secured by credentials. Some TVs (like mine) even require client certificates for incomming connections. I won't include them in this repo, but you can find them online or extract them yourself. See [Acknowledgment](https://github.com/sehaas/ha_hisense_tv#acknowledgment).
+> **VIDAA 9:** the Mosquitto bridge below no longer works on firmware
+> `V0000.09.xx` (`transport_protocol` >= 3000). The TV rejects the connection
+> with "app not compatible" / MQTT return code 5. Use the dynamic bridge in
+> [`bridge/`](bridge/README.md) instead.
 
-Connection shema:
+The MQTT broker is secured by credentials. Some TVs (like mine) even require client certificates for incoming connections. I won't include them in this repo, but you can find them online or extract them yourself. See [Acknowledgment](https://github.com/sehaas/ha_hisense_tv#acknowledgment).
+
+Connection schema:
 ```
 +-----------+          +-----------+
 | Home      |  client  | Mosquitto |
@@ -297,11 +302,20 @@ Everything I needed to write this integration could be gathered from these sourc
 
 # Installation
 
-Download the package put it in /config/custom_componennts
-HA->settings->intergrations->hisense_tv
+Download the package and put it in `/config/custom_components`, then add the integration in
+HA -> Settings -> Devices & Services -> Add Integration -> `hisense_tv`.
 
-"The integration can be added via the Home Assistant UI. Add the integration and setup your TV. During the first setup your TV should be turned on. The integration requires a PIN code from you TV. The PIN will be triggered automatically during setup. This is a onetime step where the client `HomeAssistant` is requesting access to remote controll the TV." <-- 
+# VIDAA 9 / dynamic authentication
 
-still editing<-----
+Since the VIDAA 9 firmware update (`V0000.09.xx`, `transport_protocol` >= 3000) the TV
+rejects the static Mosquitto bridge configuration above with "app not compatible" /
+MQTT return code 5. The TV now requires **dynamic authentication**: a timestamp-based
+username/password and a MAC-derived MQTT client id, plus a fresh client certificate from
+the current RemoteNOW/Vidaa app (the old certificate files no longer work).
+
+To keep using this integration, run the dynamic bridge in [`bridge/`](bridge/README.md)
+instead of the Mosquitto bridge. It connects to the TV with automatically generated
+credentials and mirrors the `/remoteapp/#` topics into Home Assistant exactly like the
+Mosquitto bridge did. The integration itself does not need to be changed.
 
 

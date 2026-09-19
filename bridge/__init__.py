@@ -1,0 +1,1 @@
+"""Dynamic MQTT bridge between Home Assistant and a Hisense/VIDAA TV."""
