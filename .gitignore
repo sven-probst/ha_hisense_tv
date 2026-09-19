@@ -3,7 +3,10 @@ custom_components/hisense_tv/SdkMqttPublishManager.java
 
 # Extracted credentials and downloads (bridge)
 certs/
-bridge/config.yaml
+custom_components/hisense_tv/bridge/config.yaml
 *.apk
 *.apkm
 *.xapk
+
+# Runtime files of the supervised bridge daemon
+hisense_bridge/

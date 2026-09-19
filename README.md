@@ -34,8 +34,8 @@ The TV provides a MQTT broker on port `36669`. Home Assistant can only communica
 
 > **VIDAA 9:** the Mosquitto bridge below no longer works on firmware
 > `V0000.09.xx` (`transport_protocol` >= 3000). The TV rejects the connection
-> with "app not compatible" / MQTT return code 5. Use the dynamic bridge in
-> [`bridge/`](bridge/README.md) instead.
+> with "app not compatible" / MQTT return code 5. Use the dynamic bridge
+> (siehe Abschnitt „VIDAA 9 / dynamic authentication").
 
 The MQTT broker is secured by credentials. Some TVs (like mine) even require client certificates for incoming connections. I won't include them in this repo, but you can find them online or extract them yourself. See [Acknowledgment](https://github.com/sehaas/ha_hisense_tv#acknowledgment).
 
@@ -313,9 +313,15 @@ MQTT return code 5. The TV now requires **dynamic authentication**: a timestamp-
 username/password and a MAC-derived MQTT client id, plus a fresh client certificate from
 the current RemoteNOW/Vidaa app (the old certificate files no longer work).
 
-To keep using this integration, run the dynamic bridge in [`bridge/`](bridge/README.md)
-instead of the Mosquitto bridge. It connects to the TV with automatically generated
-credentials and mirrors the `/remoteapp/#` topics into Home Assistant exactly like the
-Mosquitto bridge did. The integration itself does not need to be changed.
+Since version 0.3.09 the integration ships a self-contained dynamic bridge
+([`custom_components/hisense_tv/bridge/`](custom_components/hisense_tv/bridge/README.md)).
+Instead of the Mosquitto bridge it connects to the TV with automatically generated
+credentials and mirrors the `/remoteapp/#` topics into Home Assistant's MQTT broker.
+
+**Einfachste Aktivierung:** Integration in HA -> Einstellungen -> Geräte & Dienste
+öffnen -> *Bearbeiten* (Optionen) -> den Schritt „Bridge" aktivieren (TV-IP, Zertifikate,
+MAC/Brand) -> speichern. Die Integration startet den Bridge automatisch als
+überwachten Prozess (Log: `/config/hisense_bridge/bridge.log`). Alternativ kann der
+Daemon auch manuell laufen, Details im [Bridge-README](custom_components/hisense_tv/bridge/README.md).
 
 

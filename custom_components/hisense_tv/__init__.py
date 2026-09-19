@@ -33,6 +33,7 @@ from .const import (
     DEFAULT_CLIENT_ID,
     )
 from .webos_compatibility import async_setup_webos_compatibility, async_unload_webos_compatibility
+from .bridge_manager import async_setup_bridge, async_unload_bridge
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -88,6 +89,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     # Forward the setup to the platforms.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Start the optional dynamic MQTT bridge (VIDAA 9) as a supervised daemon.
+    await async_setup_bridge(hass, entry)
 
     # Helper function to get the target ConfigEntry and mqtt_out_prefix
     async def _get_target_config_info(target_entity_id: str):
@@ -280,6 +284,9 @@ async def async_update_listener(hass: HomeAssistant, entry: ConfigEntry):
 async def async_unload_entry(hass, entry):
     """Unload HisenseTV config entry."""
     _LOGGER.debug("async_unload_entry")
+
+    # Stop the supervised bridge daemon, if running.
+    await async_unload_bridge(hass, entry)
 
     # Remove the custom services
     hass.services.async_remove(DOMAIN, SERVICE_SEND_KEY)

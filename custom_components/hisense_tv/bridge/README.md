@@ -11,8 +11,9 @@ Dieser Dienst ersetzt den Mosquitto-Bridge: Er verbindet sich direkt mit dem
 MQTT-Broker des TVs (Port 36669, TLS + Client-Zertifikat), authentifiziert
 sich mit frisch generierten dynamischen Zugangsdaten und spiegelt die
 `/remoteapp/#`-Topics in den Home-Assistant-Broker – identisch zu den Prefixen
-der bisherigen Mosquitto-Konfiguration. An der HA-Integration selbst ändert
-sich nichts.
+der bisherigen Mosquitto-Konfiguration. Er liegt seit Version 0.3.09 direkt in
+der Integration (`custom_components/hisense_tv/bridge/`) und wird von HACS
+mitinstalliert.
 
 ## Voraussetzungen
 
@@ -23,9 +24,8 @@ sich nichts.
    APKMirror-Link oder per `adb` das eigene Handy):
 
    ```
-   python3 bridge/extract_certs.py --apkmirror "https://www.apkmirror.com/apk/v-america-operations-inc/vidaa-smart-tv/vidaa-smart-tv-1-09-06-002-3-release/" -o bridge/certs
-   python3 bridge/extract_certs.py --adb -o bridge/certs   # App vom Handy ziehen
-   python3 bridge/extract_certs.py -a vidaa.apk -o bridge/certs
+   python3 custom_components/hisense_tv/bridge/extract_certs.py --apkmirror "https://www.apkmirror.com/apk/v-america-operations-inc/vidaa-smart-tv/vidaa-smart-tv-1-09-06-002-3-release/" -o bridge/certs
+   python3 custom_components/hisense_tv/bridge/extract_certs.py --adb -o bridge/certs   # App vom Handy ziehen
    # Ergebnis: bridge/certs/vidaa_client.pem + vidaa_client.key
    ```
 
@@ -53,12 +53,25 @@ sich nichts.
 3. Den bestehenden Mosquitto-Bridge zum TV entfernen bzw. deaktivieren,
    sonst kämpfen zwei Verbindungen um denselben `client_id`.
 
-## Installation und Start
+## Aktivierung in Home Assistant (empfohlen)
+
+Seit 0.3.09 startet die Integration den Bridge selbst als überwachten Prozess:
+
+1. Zertifikate nach `/config/certs/` legen (`vidaa_client.pem` + `.key`).
+2. Integration -> *Bearbeiten* (Optionen) -> Schritt **„Bridge"** aktivieren,
+   TV-IP, Zertifikatspfade, ggf. MAC/Brand eintragen, speichern.
+3. Die Integration schreibt die Konfiguration nach
+   `/config/hisense_bridge/config.yaml` und startet den Daemon automatisch.
+   Log: `/config/hisense_bridge/bridge.log` (Neustart bei Absturz automatisch).
+
+## Manueller Betrieb (alternativ)
+
+Auf dem HA-Host (Abhängigkeiten sind über das Integrations-manifest
+`paho-mqtt`/`PyYAML` bereits installiert):
 
 ```
-pip install -r bridge/requirements.txt
-cp bridge/config.example.yaml bridge/config.yaml   # anpassen
-python -m bridge.bridge -c bridge/config.yaml -v
+cp custom_components/hisense_tv/bridge/config.example.yaml bridge/config.yaml   # anpassen
+python3 -m custom_components.hisense_tv.bridge.bridge -c bridge/config.yaml -v
 ```
 
 Für einen dauerhaften Betrieb z. B. als systemd-Unit oder Docker-Container auf
@@ -104,8 +117,9 @@ Session des TVs wird mit dem neuen `client_id` nicht mehr akzeptiert).
 - **TV läuft, aber der Bridge reconnectet endlos:** TV-Uhr prüfen
   (Zeitzone/DST), MAC-Vergleich: der Bridge muss dieselbe MAC verwenden, die
   der TV selbst im Deskriptor meldet.
-- **Logs:** `python -m bridge.bridge -c bridge/config.yaml -v` zeigt
-  transport_protocol, gewählte Auth-Methode und CONNACK-Codes.
+- **Logs (integriert):** `/config/hisense_bridge/bridge.log`;
+  manuell: `python3 -m custom_components.hisense_tv.bridge.bridge -c bridge/config.yaml -v`
+  zeigt transport_protocol, gewählte Auth-Methode und CONNACK-Codes.
 - **Transport-Protokoll prüfen:** `curl http://<IP>:38400/MediaServer/rendererdevicedesc.xml`
   (alternativ Port 18400). `transport_protocol < 3000` = Static Auth,
   `>= 3000` = dynamische Auth.

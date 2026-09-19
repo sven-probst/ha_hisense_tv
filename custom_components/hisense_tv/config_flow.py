@@ -30,6 +30,20 @@ from .const import (
     DOMAIN,
     DEFAULT_KEY_DELAY,
 )
+from .bridge_manager import (
+    CONF_BRIDGE_ENABLED,
+    CONF_BRIDGE_HA_HOST,
+    CONF_BRIDGE_HA_PORT,
+    CONF_BRIDGE_HA_USER,
+    CONF_BRIDGE_HA_PASS,
+    CONF_BRIDGE_TV_HOST,
+    CONF_BRIDGE_TV_PORT,
+    CONF_BRIDGE_CERTFILE,
+    CONF_BRIDGE_KEYFILE,
+    CONF_BRIDGE_MAC,
+    CONF_BRIDGE_BRAND,
+    CONF_BRIDGE_AUTH_MODE,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -378,17 +392,13 @@ class HisenseTvOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
         super().__init__()
+        self._base_options: dict = {}
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
         if user_input is not None:
-            # Update config data with new MAC so WoL uses the correct address
-            new_data = dict(self.config_entry.data)
-            new_data[CONF_MAC] = user_input[CONF_MAC]
-            self.hass.config_entries.async_update_entry(
-                self.config_entry, data=new_data, options=user_input
-            )
-            return self.async_create_entry(title="", data=user_input)
+            self._base_options = user_input
+            return await self.async_step_bridge()
 
         options_schema = vol.Schema(
             {
@@ -415,6 +425,75 @@ class HisenseTvOptionsFlow(config_entries.OptionsFlow):
             }
         )
 
-        return self.async_show_form(step_id="init", data_schema=options_schema, last_step=True)
+        return self.async_show_form(step_id="init", data_schema=options_schema)
+
+    async def async_step_bridge(self, user_input=None):
+        """Manage the optional dynamic MQTT bridge (VIDAA 9)."""
+        if user_input is not None:
+            merged = {**self._base_options, **user_input}
+            new_data = dict(self.config_entry.data)
+            new_data[CONF_MAC] = self._base_options[CONF_MAC]
+            self.hass.config_entries.async_update_entry(
+                self.config_entry, data=new_data, options=merged
+            )
+            return self.async_create_entry(title="", data=merged)
+
+        data = self.config_entry.options
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_BRIDGE_ENABLED,
+                    default=data.get(CONF_BRIDGE_ENABLED, False),
+                ): bool,
+                vol.Optional(
+                    CONF_BRIDGE_TV_HOST,
+                    description={"suggested_value": data.get(CONF_BRIDGE_TV_HOST, self.config_entry.data.get(CONF_IP_ADDRESS, ""))},
+                ): str,
+                vol.Optional(
+                    CONF_BRIDGE_TV_PORT,
+                    default=data.get(CONF_BRIDGE_TV_PORT, 36669),
+                ): vol.Coerce(int),
+                vol.Optional(
+                    CONF_BRIDGE_CERTFILE,
+                    description={"suggested_value": data.get(CONF_BRIDGE_CERTFILE, "/config/certs/vidaa_client.pem")},
+                ): str,
+                vol.Optional(
+                    CONF_BRIDGE_KEYFILE,
+                    description={"suggested_value": data.get(CONF_BRIDGE_KEYFILE, "/config/certs/vidaa_client.key")},
+                ): str,
+                vol.Optional(
+                    CONF_BRIDGE_MAC,
+                    description={"suggested_value": data.get(CONF_BRIDGE_MAC, self.config_entry.data.get(CONF_MAC, ""))},
+                ): str,
+                vol.Optional(
+                    CONF_BRIDGE_BRAND,
+                    description={"suggested_value": data.get(CONF_BRIDGE_BRAND, "")},
+                ): str,
+                vol.Optional(
+                    CONF_BRIDGE_AUTH_MODE,
+                    default=data.get(CONF_BRIDGE_AUTH_MODE, "auto"),
+                ): vol.In(["auto", "static", "dynamic"]),
+                vol.Optional(
+                    CONF_BRIDGE_HA_HOST,
+                    default=data.get(CONF_BRIDGE_HA_HOST, "127.0.0.1"),
+                ): str,
+                vol.Optional(
+                    CONF_BRIDGE_HA_PORT,
+                    default=data.get(CONF_BRIDGE_HA_PORT, 1883),
+                ): vol.Coerce(int),
+                vol.Optional(
+                    CONF_BRIDGE_HA_USER,
+                    description={"suggested_value": data.get(CONF_BRIDGE_HA_USER, "")},
+                ): str,
+                vol.Optional(
+                    CONF_BRIDGE_HA_PASS,
+                    description={"suggested_value": data.get(CONF_BRIDGE_HA_PASS, "")},
+                ): str,
+            }
+        )
+
+        return self.async_show_form(
+            step_id="bridge", data_schema=schema, last_step=True
+        )
 
 
