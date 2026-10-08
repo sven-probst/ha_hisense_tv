@@ -21,7 +21,9 @@ _LOGGER = logging.getLogger(__name__)
 
 # Topic constants for authentication flow
 # These match the Hisense VIDAA MQTT protocol
-TOKEN_TOPIC_PUBLISH = "/remoteapp/tv/platform_service/{client_id}/actions/gettoken"
+# VIDAA 9 (transport_protocol >= 3000) serves the token on the /data/ path;
+# /actions/ is silently ignored there. Older firmware accepts /data/ too.
+TOKEN_TOPIC_PUBLISH = "/remoteapp/tv/platform_service/{client_id}/data/gettoken"
 TOKEN_TOPIC_RESPONSE = "/remoteapp/mobile/{client_id}/platform_service/data/tokenissuance"
 AUTH_TOPIC_PUBLISH = "/remoteapp/tv/ui_service/{client_id}/actions/vidaa_app_connect"
 AUTH_TOPIC_RESPONSE = "/remoteapp/mobile/{client_id}/ui_service/data/vidaa_app_connect"
@@ -269,15 +271,23 @@ class HisenseAuthManager:
             )
             
             # Request token
-            await mqtt.async_publish(self._hass, topic_publish, "")
+            # Request token (payload required by the TV; empty string is ignored)
+            await mqtt.async_publish(
+                self._hass, topic_publish, json.dumps({"refreshtoken": ""})
+            )
             _LOGGER.debug("Requested token from TV")
             
             # Wait for response
             response = await asyncio.wait_for(queue.get(), timeout=10)
             
             if response:
-                # Extract token from response
-                token_value = response.get("token") or response.get("token_value")
+                # Extract token from response (firmware sends accesstoken/
+                # refreshtoken; older fields kept as fallbacks)
+                token_value = (
+                    response.get("accesstoken")
+                    or response.get("token")
+                    or response.get("token_value")
+                )
                 if token_value:
                     now = datetime.now()
                     self._token = AuthToken(

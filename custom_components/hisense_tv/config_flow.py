@@ -5,7 +5,6 @@ from json.decoder import JSONDecodeError
 import logging
 import re
 import xml.etree.ElementTree as ET
-import hashlib
 
 import aiohttp
 import voluptuous as vol
@@ -280,12 +279,12 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
             # First, send vidaa_app_connect to establish a session with the TV
-            # (mimicking the official VIDAA app behavior)
+            # (mimicking the official VIDAA app behavior; payload verified
+            # against a live V0000.09.xx TV)
             connect_payload = json.dumps({
                 "app_version": 2,
+                "connect_result": 0,
                 "device_type": "Mobile App",
-                "device_id": hashlib.sha256(f"HisenseTV_{self.unique_id or self._mac_address or 'HomeAssistant'}".encode()).hexdigest()[:32],
-                "mac_address": self.unique_id or self._mac_address or "",
             })
             await mqtt.async_publish(
                 self.hass,
@@ -334,6 +333,26 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_auth(self, user_input=None):
         """Auth handler - enter PIN displayed on TV."""
         errors = {}
+        if user_input is None:
+            # VIDAA 9 shows the PIN dialog only after vidaa_app_connect.
+            # Trigger it as soon as the form opens, so the code is already on
+            # screen while the user types it (also covers reauth, which skips
+            # the check_auth step).
+            mqtt_out = self._data[CONF_MQTT_OUT]
+            connect_payload = json.dumps(
+                {"app_version": 2, "connect_result": 0, "device_type": "Mobile App"}
+            )
+            await mqtt.async_publish(
+                self.hass,
+                f"{mqtt_out}/remoteapp/tv/ui_service/{self._client_id}/actions/vidaa_app_connect",
+                connect_payload,
+            )
+            _LOGGER.debug("Sent vidaa_app_connect for PIN dialog (form opened)")
+            return self.async_show_form(
+                step_id="auth",
+                data_schema=vol.Schema({vol.Required(CONF_PIN): str}),
+                errors=errors,
+            )
         if user_input is not None:
             mqtt_in = self._data[CONF_MQTT_IN]
             mqtt_out = self._data[CONF_MQTT_OUT]
@@ -356,8 +375,28 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 auth_response_callback
             )
             try:
-                # Send the PIN entered by the user to the TV
-                payload = json.dumps({"authNum": str(user_input[CONF_PIN])})
+                # VIDAA 9 shows the PIN dialog only after vidaa_app_connect.
+                # Send it (again) so the dialog is fresh for initial setup AND
+                # reauth; payload verified against a live V0000.09.xx TV.
+                connect_payload = json.dumps(
+                    {
+                        "app_version": 2,
+                        "connect_result": 0,
+                        "device_type": "Mobile App",
+                    }
+                )
+                await mqtt.async_publish(
+                    self.hass,
+                    f"{mqtt_out}/remoteapp/tv/ui_service/{self._client_id}/actions/vidaa_app_connect",
+                    connect_payload,
+                )
+                # Give the TV a moment to open the dialog before the PIN lands.
+                await asyncio.sleep(0.5)
+
+                # Send the PIN entered by the user to the TV.
+                # VIDAA requires the PIN as an integer; a string is rejected
+                # with "illegal authNum!!".
+                payload = json.dumps({"authNum": int(user_input[CONF_PIN])})
                 await mqtt.async_publish(
                     self.hass,
                     f"{mqtt_out}/remoteapp/tv/ui_service/{self._client_id}/actions/authenticationcode",

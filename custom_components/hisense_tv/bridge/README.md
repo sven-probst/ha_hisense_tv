@@ -110,13 +110,32 @@ Setup/Reauth löst sie `vidaa_app_connect` aus, der TV zeigt eine PIN, die in
 HA eingegeben wird. Nach dem Firmware-Update einmal erneut pairen (alte
 Session des TVs wird mit dem neuen `client_id` nicht mehr akzeptiert).
 
+VIDAA-9-Details, die beim Pairing zwingend sind (seit 0.3.11 in der Integration
+korrekt umgesetzt):
+
+- Die PIN wird als **Integer** gesendet (`{"authNum": 1234}`). Als String
+  antwortet der TV mit `result:100 "illegal authNum!!"`.
+- Der Token wird über `/remoteapp/tv/platform_service/{cid}/data/gettoken`
+  angefragt (nicht `/actions/`); erst nach Ausstellung des `accesstoken`
+  (2 Tage gültig) gibt der TV-Broker die Daten-Topics frei.
+- **Keine Wildcard-Subscriptions:** VIDAA 9 lehnt `…#`-Abos ab. Der Bridge
+  abonniert deshalb die exakten Antwort-/Broadcast-Topics und erneuert sie
+  periodisch, damit die Freigaben nach dem Pairing ankommen. Ältere Firmware
+  gewährt dieselben exakten Topics sofort – der Bridge bleibt abwärtskompatibel.
+
 ## Troubleshooting
 
 - **„App nicht kompatibel“ / CONNACK 5:** Old Static-Creds bzw. alte Zertifikate
   – frische Zertifikate aus der aktuellen App verwenden, `auth_mode` prüfen.
+- **PIN abgelehnt (`illegal authNum!!`):** veraltete Integration (< 0.3.11)
+  schickt die PIN als String; Upgrade auf 0.3.11 oder PIN manuell als Integer.
+- **Keine TV-Antworten trotz Verbindung:** Wildcard-Abos werden auf VIDAA 9
+  verweigert – genau-zugeschnittene Topics verwenden (Bridge 0.3.11+) und nach
+  dem PIN-Pairing ggf. 45 s für das erneute Subscribe warten.
 - **TV läuft, aber der Bridge reconnectet endlos:** TV-Uhr prüfen
   (Zeitzone/DST), MAC-Vergleich: der Bridge muss dieselbe MAC verwenden, die
-  der TV selbst im Deskriptor meldet.
+  der TV selbst im Deskriptor meldet (Groß-/Kleinschreibung ändert die
+  abgeleitete Client-ID!).
 - **Logs (integriert):** `/config/hisense_bridge/bridge.log`;
   manuell: `python3 -m custom_components.hisense_tv.bridge.bridge -c bridge/config.yaml -v`
   zeigt transport_protocol, gewählte Auth-Methode und CONNACK-Codes.

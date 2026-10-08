@@ -50,6 +50,43 @@ _CONNACK_CODES = {
     5: "not authorized - check TV credentials, certificates and clock",
 }
 
+# VIDAA 9 firmware refuses wildcard subscriptions ("not authorized") and only
+# grants the exact topics the client is authorized for once it is paired (and,
+# on token-based firmware, has obtained the access token). Older firmware
+# grants these exact topics immediately (they are a subset of the wildcards
+# the old Mosquitto bridge used), so the same list works for every generation.
+# The client id in the topics is the TV-side topic id (`{cid}` placeholder).
+TV_SUBSCRIBE_TOPICS = (
+    "/remoteapp/mobile/{cid}/ui_service/data/authentication",
+    "/remoteapp/mobile/{cid}/ui_service/data/authenticationcode",
+    "/remoteapp/mobile/{cid}/ui_service/data/authenticationcodetoast",
+    "/remoteapp/mobile/{cid}/ui_service/data/authenticationcodeclose",
+    "/remoteapp/mobile/{cid}/ui_service/data/vidaa_app_connect",
+    "/remoteapp/mobile/{cid}/ui_service/data/vidaa_app_ble_connect",
+    "/remoteapp/mobile/{cid}/ui_service/data/sourcelist",
+    "/remoteapp/mobile/{cid}/ui_service/data/applist",
+    "/remoteapp/mobile/{cid}/ui_service/data/capability",
+    "/remoteapp/mobile/{cid}/ui_service/data/appversion",
+    "/remoteapp/mobile/{cid}/ui_service/data/login_each_other_info",
+    "/remoteapp/mobile/{cid}/ui_service/data/state",
+    "/remoteapp/mobile/{cid}/platform_service/data/tokenissuance",
+    "/remoteapp/mobile/{cid}/platform_service/data/gettvinfo",
+    "/remoteapp/mobile/{cid}/platform_service/data/getdeviceinfo",
+    "/remoteapp/mobile/{cid}/platform_service/data/getplatformcapbility",
+    "/remoteapp/mobile/{cid}/platform_service/data/channellist",
+    "/remoteapp/mobile/broadcast/ui_service/state",
+    "/remoteapp/mobile/broadcast/ui_service/data/hotelmodechange",
+    "/remoteapp/mobile/broadcast/platform_service/actions/tvsleep",
+    "/remoteapp/mobile/broadcast/platform_service/actions/volumechange",
+    "/remoteapp/mobile/broadcast/platform_service/actions/bwsinputdata",
+    "/remoteapp/mobile/broadcast/platform_service/data/picturesetting",
+)
+
+# How often the exact topics are re-subscribed. VIDAA 9 only grants the data
+# topics after pairing + token issuance, which happens via the HA integration
+# sometime after the bridge connected; re-subscribing picks the grants up.
+RESUBSCRIBE_INTERVAL = 45
+
 
 def _new_paho_client(client_id: str) -> mqtt.Client:
     """Create a paho client (works with paho-mqtt 1.x and 2.x).
@@ -140,6 +177,7 @@ class TvConnection:
             brand or "?",
             [m.value for m in self._order],
         )
+        threading.Thread(target=self._resubscribe_loop, daemon=True).start()
         self._connect()
 
     def publish(self, topic: str, payload, retain: bool):
@@ -268,7 +306,7 @@ class TvConnection:
         rc = _reason_code(rc)
         if rc == 0:
             _LOGGER.info("TV %s: connected to MQTT broker", self.host)
-            client.subscribe("/remoteapp/#", qos=0)
+            self._subscribe_topics(client)
             return
         reason = _CONNACK_CODES.get(rc, f"unknown code {rc}")
         _LOGGER.error("TV %s: connection refused: %s", self.host, reason)
@@ -292,8 +330,42 @@ class TvConnection:
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("TV %s: could not refresh credentials: %s", self.host, err)
 
+    def _subscribe_topics(self, client, reason=""):
+        """Subscribe the exact TV response topics.
+
+        VIDAA 9 refuses subscriptions to topics the client is not yet
+        authorized for; older firmware grants them right away. The periodic
+        re-subscribe picks up grants that appear after pairing/token issuance.
+        """
+        cid = self._tv_topic_client_id
+        if not cid:
+            return
+        for template in TV_SUBSCRIBE_TOPICS:
+            client.subscribe(template.format(cid=cid), qos=0)
+        if reason:
+            _LOGGER.debug("TV %s: subscribed exact topics (%s)", self.host, reason)
+
+    def _resubscribe_loop(self):
+        while not self._closed:
+            time.sleep(RESUBSCRIBE_INTERVAL)
+            if self._closed:
+                return
+            client = self._client
+            if client is not None and client.is_connected():
+                try:
+                    self._subscribe_topics(client, "periodic")
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.debug("TV %s: periodic resubscribe failed: %s", self.host, err)
+
     def _on_message(self, client, userdata, msg):
         self._on_message_to_ha(self._tv_to_ha(msg.topic), msg.payload, msg.retain)
+        # VIDAA 9 unlocks the data topics only after pairing (PIN) + token
+        # issuance; grab the new grants as soon as those arrive.
+        if "/tokenissuance" in msg.topic or "/data/authenticationcode" in msg.topic:
+            try:
+                self._subscribe_topics(client, "auth-update")
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("TV %s: resubscribe after auth failed: %s", self.host, err)
 
     # ---------------------------------------------------------- topic mapping
 

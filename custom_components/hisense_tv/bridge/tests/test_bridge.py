@@ -100,3 +100,19 @@ class TestTopicMapping(unittest.TestCase):
             tv._tv_to_ha("/remoteapp/mobile/HomeAssistant/ui_service/data/state"),
             "my/tv/remoteapp/mobile/HomeAssistant/ui_service/data/state",
         )
+
+    def test_subscribe_topics_are_exact(self):
+        from ..bridge import TV_SUBSCRIBE_TOPICS
+
+        self.assertTrue(TV_SUBSCRIBE_TOPICS)
+        for template in TV_SUBSCRIBE_TOPICS:
+            self.assertNotIn("#", template, f"wildcard not allowed: {template}")
+            self.assertNotIn("+", template, f"wildcard not allowed: {template}")
+            cid = "AA:BB:CC:DD:EE:FF$his$ABCDEF_vidaacommon_001"
+            if "/broadcast/" in template:
+                self.assertNotIn("{cid}", template)
+                formatted = template
+            else:
+                self.assertIn("{cid}", template)
+                formatted = template.format(cid=cid)
+            self.assertTrue(formatted.startswith("/remoteapp/"))
