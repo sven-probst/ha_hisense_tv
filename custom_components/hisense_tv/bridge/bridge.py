@@ -20,6 +20,7 @@ Run e.g. as ``python -m bridge.bridge -c bridge/config.yaml``.
 
 import argparse
 import logging
+import os
 import signal
 import ssl
 import sys
@@ -205,17 +206,45 @@ class TvConnection:
         if method == AuthMethod.STATIC:
             return generate_static(self.topic_client_id)
         if not self._mac:
+            self._mac, self._brand = self._probe_mac()
+        if not self._mac:
             raise ValueError(
                 f"{self.host}: {method.value} auth needs the TV's MAC address "
                 "(set 'mac' in the config or enable UPnP detection)"
             )
         return generate_dynamic(self._mac, self._brand or "his", method)
 
+    def _probe_mac(self):
+        """Re-read the TV descriptor for the auth MAC when it is missing.
+
+        The dynamic-auth MAC is the TV's *wired* / descriptor ``mac`` field,
+        which is independent of the WoL MAC (WiFi) the HA config entry uses.
+        Tries again on every connect, so a TV that was off at startup is
+        picked up as soon as it is reachable.
+        """
+        try:
+            detected = upnp.detect(self.host, mac=None, brand=self._brand)
+            mac = detected.get("mac")
+            if mac:
+                _LOGGER.info(
+                    "TV %s: auth MAC auto-detected from descriptor: %s", self.host, mac
+                )
+            return mac, detected.get("brand") or self._brand
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("TV %s: re-probing descriptor failed: %s", self.host, err)
+            return None, self._brand
+
     # -------------------------------------------------------------- connect
 
     def _build_client(self, creds) -> mqtt.Client:
         client = _new_paho_client(creds.client_id)
         if self.certfile and self.keyfile:
+            for cert_path in (self.certfile, self.keyfile):
+                if not cert_path or not os.path.isfile(cert_path):
+                    raise FileNotFoundError(
+                        f"certificate file not found: {cert_path} - run "
+                        "setup_certs.py or fix certfile/keyfile in the config"
+                    )
             client.tls_set(
                 ca_certs=self.ca_certs,
                 certfile=self.certfile,

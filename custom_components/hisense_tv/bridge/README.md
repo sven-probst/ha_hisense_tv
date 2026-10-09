@@ -136,6 +136,12 @@ korrekt umgesetzt):
   (Zeitzone/DST), MAC-Vergleich: der Bridge muss dieselbe MAC verwenden, die
   der TV selbst im Deskriptor meldet (Groß-/Kleinschreibung ändert die
   abgeleitete Client-ID!).
+- **WLAN- vs. Ethernet-MAC:** Das TV-`mac`-Feld im Deskriptor (für die
+  dynamische Auth) ist oft die **Ethernet-MAC** und unterscheidet sich von der
+  **WLAN-MAC**, die HA für Wake-on-LAN nutzt (Entry-`CONF_MAC`). Beides nicht
+  verwechseln: Bridge-Feld `mac` leer lassen (= Auto-Erkennung aus dem
+  Deskriptor) oder explizit auf die Deskriptor-MAC setzen; WoL läuft
+  unabhängig über die Entry-MAC weiter.
 - **Logs (integriert):** `/config/hisense_bridge/bridge.log`;
   manuell: `python3 -m custom_components.hisense_tv.bridge.bridge -c bridge/config.yaml -v`
   zeigt transport_protocol, gewählte Auth-Methode und CONNACK-Codes.

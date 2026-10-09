@@ -502,7 +502,9 @@ class HisenseTvOptionsFlow(config_entries.OptionsFlow):
                 ): str,
                 vol.Optional(
                     CONF_BRIDGE_MAC,
-                    description={"suggested_value": data.get(CONF_BRIDGE_MAC, self.config_entry.data.get(CONF_MAC, ""))},
+                    description={
+                        "suggested_value": data.get(CONF_BRIDGE_MAC, ""),
+                    },
                 ): str,
                 vol.Optional(
                     CONF_BRIDGE_BRAND,
