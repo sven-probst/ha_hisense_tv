@@ -146,6 +146,11 @@ class TvConnection:
         self._tv_topic_client_id = topic_client_id
         self._rotate_pending = False
         self._closed = False
+        # Flap detection: rapid connect/disconnect means a second client is
+        # sharing the same MQTT client id (duplicate entry or orphaned bridge).
+        self._last_connect_time = 0.0
+        self._rapid_disconnects = 0
+        self._flap_warned = False
 
         # Set by start() from config/descriptor
         self._auth_mode = "auto"
@@ -335,6 +340,7 @@ class TvConnection:
         rc = _reason_code(rc)
         if rc == 0:
             _LOGGER.info("TV %s: connected to MQTT broker", self.host)
+            self._last_connect_time = time.monotonic()
             self._subscribe_topics(client)
             return
         reason = _CONNACK_CODES.get(rc, f"unknown code {rc}")
@@ -353,6 +359,24 @@ class TvConnection:
             self.host,
             _reason_code(code),
         )
+        # Flap detection: being kicked moments after connecting means another
+        # client is using the same MQTT client id (duplicate config entry or
+        # an orphaned bridge process from an earlier run).
+        now = time.monotonic()
+        if self._last_connect_time and now - self._last_connect_time < 3.0:
+            self._rapid_disconnects += 1
+        else:
+            self._rapid_disconnects = 0
+        if self._rapid_disconnects >= 4 and not self._flap_warned:
+            self._flap_warned = True
+            _LOGGER.error(
+                "TV %s: rapid connect/disconnect loop detected - another "
+                "client (duplicate config entry or orphaned bridge process) "
+                "is probably sharing client id %r. Remove duplicate entries "
+                "and kill leftover bridge processes.",
+                self.host,
+                self._tv_topic_client_id,
+            )
         try:
             creds = self._creds(self._method)
             client.username_pw_set(creds.username, creds.password)
@@ -371,12 +395,14 @@ class TvConnection:
             return
         for template in TV_SUBSCRIBE_TOPICS:
             client.subscribe(template.format(cid=cid), qos=0)
-        # Bonus for legacy firmware (which still allows wildcards, like the
-        # old Mosquitto bridge did): also try a wildcard so any topic the TV
-        # emits is mirrored. VIDAA 9 refuses this ("not authorized") - harmless.
-        client.subscribe("/remoteapp/#", qos=0)
+        # Wildcard only for pre-/non-token firmware (STATIC/LEGACY), where it
+        # is granted and adds full coverage like the old Mosquitto bridge.
+        # VIDAA 9 (MIDDLE/MODERN) refuses - and dropping the socket on a
+        # refused SUBSCRIBE is what made the bridge flap, so never try it there.
+        if self._method in (AuthMethod.STATIC, AuthMethod.LEGACY):
+            client.subscribe("/remoteapp/#", qos=0)
         if reason:
-            _LOGGER.debug("TV %s: subscribed exact topics + wildcard (%s)", self.host, reason)
+            _LOGGER.debug("TV %s: subscribed exact topics (%s)", self.host, reason)
 
     def _resubscribe_loop(self):
         while not self._closed:
