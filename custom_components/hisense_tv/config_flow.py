@@ -310,9 +310,15 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
 
         except asyncio.TimeoutError:
-            # No response at all - TV might be off or unreachable
-            _LOGGER.warning("No response from TV during auth check")
-            return self.async_abort(reason="auth_timeout")
+            # No response at all - TV off, unreachable, or (on VIDAA 9) no
+            # dynamic bridge running yet. Create the entry anyway so its
+            # options (and thus the bridge) become reachable; the user can
+            # enable the bridge and then pair via Reauth.
+            _LOGGER.warning(
+                "No response from TV during auth check; creating the entry so "
+                "the bridge can be configured, then re-authenticate to pair"
+            )
+            return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
         except Exception as e:
             _LOGGER.error("Unexpected error during auth check: %s", e)
             return self.async_abort(reason="unknown_error")

@@ -371,8 +371,12 @@ class TvConnection:
             return
         for template in TV_SUBSCRIBE_TOPICS:
             client.subscribe(template.format(cid=cid), qos=0)
+        # Bonus for legacy firmware (which still allows wildcards, like the
+        # old Mosquitto bridge did): also try a wildcard so any topic the TV
+        # emits is mirrored. VIDAA 9 refuses this ("not authorized") - harmless.
+        client.subscribe("/remoteapp/#", qos=0)
         if reason:
-            _LOGGER.debug("TV %s: subscribed exact topics (%s)", self.host, reason)
+            _LOGGER.debug("TV %s: subscribed exact topics + wildcard (%s)", self.host, reason)
 
     def _resubscribe_loop(self):
         while not self._closed:
