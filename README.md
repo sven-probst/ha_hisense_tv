@@ -320,9 +320,8 @@ credentials and mirrors the `/remoteapp/#` topics into Home Assistant's MQTT bro
 
 **Einfachste Aktivierung:** Integration in HA -> Einstellungen -> Geräte & Dienste
 öffnen -> *Bearbeiten* (Optionen) -> den Schritt „Bridge" aktivieren (TV-IP, Zertifikate,
-MAC/Brand) -> speichern. Die Integration betreibt den Bridge dann **im HA-Prozess als
-Daemon-Thread** (kein separater Prozess; Logs im HA-Log unter Logger `hisense_bridge`).
-Alternativ kann der Daemon auch eigenständig laufen, Details im
-[Bridge-README](custom_components/hisense_tv/bridge/README.md).
+MAC/Brand) -> speichern. Die Integration startet den Bridge automatisch als
+überwachten Prozess (Log: `/config/hisense_bridge/bridge.log`). Alternativ kann der
+Daemon auch manuell laufen, Details im [Bridge-README](custom_components/hisense_tv/bridge/README.md).
 
 
