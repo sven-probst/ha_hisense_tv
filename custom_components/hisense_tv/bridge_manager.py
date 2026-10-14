@@ -104,7 +104,10 @@ async def async_setup_bridge(hass: HomeAssistant, entry: ConfigEntry):
 
     store["bridge"] = bridge
     _LOGGER.info(
-        "In-process bridge started for %s (TV %s)",
+        "In-process bridge started for %s (TV %s). If the connection flaps "
+        "(repeated connect/disconnect), a leftover bridge process from an "
+        "older version may be sharing the client id - clean it up with "
+        "'pkill -f hisense_tv.bridge.bridge' and restart Home Assistant.",
         entry.title,
         cfg["tvs"][0]["host"],
     )
