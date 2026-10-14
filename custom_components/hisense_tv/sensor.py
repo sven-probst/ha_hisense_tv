@@ -48,6 +48,10 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 class HisenseTvSensor(SensorEntity, HisenseTvBase):
     """Representation of a sensor that can be updated using MQTT."""
 
+    # Capabilities are largely static; refresh the tv_info/capability blocks
+    # every 5 minutes instead of every default 30s poll.
+    SCAN_INTERVAL = timedelta(minutes=5)
+
     def __init__(self, hass, name, mqtt_in, mqtt_out, mac, uid, ip_address):
         super().__init__(
             hass=hass,

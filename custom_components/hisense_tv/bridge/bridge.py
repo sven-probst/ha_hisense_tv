@@ -87,6 +87,9 @@ TV_SUBSCRIBE_TOPICS = (
 # topics after pairing + token issuance, which happens via the HA integration
 # sometime after the bridge connected; re-subscribing picks the grants up.
 RESUBSCRIBE_INTERVAL = 45
+# Once any TV data message has arrived (subscriptions known to be live), the
+# re-subscribes drop to this quiet interval to avoid pointless SUBSCRIBE churn.
+RESUBSCRIBE_QUIET = 600
 
 
 def _new_paho_client(client_id: str) -> mqtt.Client:
@@ -151,6 +154,7 @@ class TvConnection:
         self._last_connect_time = 0.0
         self._rapid_disconnects = 0
         self._flap_warned = False
+        self._subscribed_ok = False
 
         # Set by start() from config/descriptor
         self._auth_mode = "auto"
@@ -406,7 +410,10 @@ class TvConnection:
 
     def _resubscribe_loop(self):
         while not self._closed:
-            time.sleep(RESUBSCRIBE_INTERVAL)
+            # Once the data topics are known to be granted (any TV data
+            # arrived), the tight unlock-polling is no longer needed.
+            interval = RESUBSCRIBE_QUIET if self._subscribed_ok else RESUBSCRIBE_INTERVAL
+            time.sleep(interval)
             if self._closed:
                 return
             client = self._client
@@ -418,6 +425,10 @@ class TvConnection:
 
     def _on_message(self, client, userdata, msg):
         self._on_message_to_ha(self._tv_to_ha(msg.topic), msg.payload, msg.retain)
+        if not self._subscribed_ok and msg.topic.startswith("/remoteapp/mobile/"):
+            # Any inbound mobile message confirms the subscriptions are live,
+            # so the tight unlock-polling can drop to the quiet interval.
+            self._subscribed_ok = True
         # VIDAA 9 unlocks the data topics only after pairing (PIN) + token
         # issuance; grab the new grants as soon as those arrive.
         if "/tokenissuance" in msg.topic or "/data/authenticationcode" in msg.topic:
