@@ -1,21 +1,15 @@
-"""Supervisor for the bundled Hisense/VIDAA dynamic MQTT bridge.
+"""In-process supervisor for the bundled Hisense/VIDAA dynamic MQTT bridge.
 
 On VIDAA 9 firmware the TV rejects the static Mosquitto bridge; the bundled
-``bridge`` package (custom_components/hisense_tv/bridge) connects to the TV
-broker with dynamic credentials and mirrors the /remoteapp/# topics into Home
-Assistant's MQTT broker. This module starts that daemon as a supervised
-subprocess for a config entry and restarts it while the entry is loaded.
+``bridge`` package connects to the TV broker with dynamic credentials and
+mirrors the ``/remoteapp/#`` topics into Home Assistant's MQTT broker.
 
+The bridge runs as a daemon thread inside the Home Assistant process (no
+separate process): HA starts and stops it together with the config entry.
 Enable it in the integration's options flow (step "bridge").
 """
 
-import asyncio
 import logging
-import os
-import sys
-import time
-
-import yaml
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_IP_ADDRESS
@@ -43,15 +37,9 @@ CONF_BRIDGE_MAC = "bridge_mac"
 CONF_BRIDGE_BRAND = "bridge_brand"
 CONF_BRIDGE_AUTH_MODE = "bridge_auth_mode"
 
-DIR_NAME = "hisense_bridge"
-CONFIG_FILENAME = "config.yaml"
-LOG_FILENAME = "bridge.log"
-RESTART_DELAY = 8
-MAX_RAPID_RESTARTS = 5
-
 
 def get_entry_data(entry: ConfigEntry) -> dict:
-    """Configuration is stored in entry data (setup) and options (options flow)."""
+    """Configuration lives in entry data (setup) and options (options flow)."""
     return {**entry.data, **entry.options}
 
 
@@ -67,7 +55,7 @@ def _build_config(entry: ConfigEntry) -> dict:
         "tvs": [
             {
                 "name": entry.title,
-                "host": data.get(CONF_BRIDGE_TV_HOST) or "",
+                "host": data.get(CONF_BRIDGE_TV_HOST) or data.get(CONF_IP_ADDRESS) or "",
                 "port": int(data.get(CONF_BRIDGE_TV_PORT) or 36669),
                 "mac": data.get(CONF_BRIDGE_MAC) or None,
                 "brand": data.get(CONF_BRIDGE_BRAND) or None,
@@ -82,20 +70,8 @@ def _build_config(entry: ConfigEntry) -> dict:
     }
 
 
-def _write_files(hass: HomeAssistant, cfg: dict):
-    directory = hass.config.path(DIR_NAME)
-    os.makedirs(directory, exist_ok=True)
-    config_path = os.path.join(directory, CONFIG_FILENAME)
-    with open(config_path, "w", encoding="utf-8") as fh:
-        yaml.safe_dump(cfg, fh, default_flow_style=False)
-        fh.flush()
-        os.fsync(fh.fileno())
-    os.chmod(config_path, 0o600)
-    return config_path
-
-
 async def async_setup_bridge(hass: HomeAssistant, entry: ConfigEntry):
-    """Start the supervised bridge for the config entry if enabled."""
+    """Start the in-process bridge for the config entry if enabled."""
     store = hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})
     await async_unload_bridge(hass, entry)
 
@@ -103,125 +79,45 @@ async def async_setup_bridge(hass: HomeAssistant, entry: ConfigEntry):
     if not data.get(CONF_BRIDGE_ENABLED):
         return
 
-    mqtt_in = data.get(CONF_MQTT_IN)
-    if not mqtt_in:
-        _LOGGER.error("Bridge requires MQTT in/out prefixes; check the entry configuration.")
+    if not data.get(CONF_MQTT_IN):
+        _LOGGER.error(
+            "Bridge requires MQTT in/out prefixes; check the entry configuration."
+        )
         return
-    tv_host = data.get(CONF_BRIDGE_TV_HOST) or data.get(CONF_IP_ADDRESS)
-    if not tv_host:
+    if not (data.get(CONF_BRIDGE_TV_HOST) or data.get(CONF_IP_ADDRESS)):
         _LOGGER.error("Bridge is enabled but no TV host is set (options -> Bridge).")
         return
 
     try:
-        cfg = _build_config(entry)
-        config_path = _write_files(hass, cfg)
+        from .bridge.bridge import Bridge
     except Exception as err:  # noqa: BLE001
-        _LOGGER.error("Could not write bridge configuration: %s", err)
+        _LOGGER.error("Bundled bridge could not be imported: %s", err)
         return
 
-    log_path = os.path.join(hass.config.path(DIR_NAME), LOG_FILENAME)
-    log_handle = open(log_path, "ab")
-
+    cfg = _build_config(entry)
     try:
-        process = await asyncio.create_subprocess_exec(
-            sys.executable,
-            "-m",
-            "custom_components.hisense_tv.bridge.bridge",
-            "-c",
-            config_path,
-            cwd=hass.config.config_dir,
-            stdout=log_handle,
-            stderr=asyncio.subprocess.STDOUT,
-            stdin=asyncio.subprocess.DEVNULL,
-        )
+        bridge = Bridge(entry.title, cfg["tvs"][0], cfg["mqtt"])
+        await hass.async_add_executor_job(bridge.start)
     except Exception as err:  # noqa: BLE001
-        log_handle.close()
-        _LOGGER.error("Could not start the bridge daemon: %s", err)
+        _LOGGER.error("Bridge failed to start: %s", err)
         return
 
-    state = {
-        "process": process,
-        "log": log_handle,
-        "restarts": 0,
-        "last_start": time.monotonic(),
-    }
-    task = asyncio.create_task(
-        _watch_bridge(hass, entry, state),
-        name=f"hisense_tv_bridge_{entry.entry_id}",
-    )
-    state["task"] = task
-    store["bridge"] = state
+    store["bridge"] = bridge
     _LOGGER.info(
-        "Bridge daemon started (PID %s); log: %s", process.pid, log_path
+        "In-process bridge started for %s (TV %s)",
+        entry.title,
+        cfg["tvs"][0]["host"],
     )
-
-
-async def _watch_bridge(hass: HomeAssistant, entry: ConfigEntry, state: dict):
-    """Restart the daemon until the entry is unloaded."""
-    process = state["process"]
-    try:
-        returncode = await process.wait()
-    finally:
-        if state["log"]:
-            state["log"].close()
-            state["log"] = None
-
-    store = hass.data.get(DOMAIN, {}).get(entry.entry_id)
-    if store is None or store.get("bridge") is not state:
-        return
-
-    enabled = get_entry_data(entry).get(CONF_BRIDGE_ENABLED)
-    if not enabled:
-        return
-
-    _LOGGER.warning(
-        "Bridge daemon exited (code %s), restarting in %ss...",
-        returncode,
-        RESTART_DELAY,
-    )
-    # Only count as repeated crash if the last run was short; a long-lived
-    # daemon that dies once should not accumulate towards the crash limit.
-    last_start = state.get("last_start")
-    if last_start is None or time.monotonic() - last_start > 300:
-        state["restarts"] = 1
-    else:
-        state["restarts"] += 1
-    if state["restarts"] >= MAX_RAPID_RESTARTS:
-        _LOGGER.error(
-            "Bridge daemon crashed %s times in a row; giving up. Check the "
-            "log at %s/%s (e.g. missing paho-mqtt or bad certificates).",
-            MAX_RAPID_RESTARTS,
-            hass.config.path(DIR_NAME),
-            LOG_FILENAME,
-        )
-        return
-
-    store.pop("bridge", None)
-    await asyncio.sleep(RESTART_DELAY)
-    if hass.data.get(DOMAIN, {}).get(entry.entry_id) is store:
-        await async_setup_bridge(hass, entry)
 
 
 async def async_unload_bridge(hass: HomeAssistant, entry: ConfigEntry):
-    """Stop the supervised bridge for the config entry."""
+    """Stop the in-process bridge for the config entry."""
     store = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
-    state = store.pop("bridge", None)
-    if not state:
+    bridge = store.pop("bridge", None)
+    if bridge is None:
         return
-
-    task = state.pop("task", None)
-    if task:
-        task.cancel()
-    process = state.get("process")
-    if process and process.returncode is None:
-        process.terminate()
-        try:
-            await asyncio.wait_for(process.wait(), timeout=10)
-        except asyncio.TimeoutError:
-            process.kill()
-    log_handle = state.get("log")
-    if log_handle:
-        try:
-            log_handle.close()
-        except OSError:
-            pass
+    try:
+        await hass.async_add_executor_job(bridge.close)
+        _LOGGER.info("In-process bridge stopped for %s", entry.title)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.error("Error stopping the bridge: %s", err)

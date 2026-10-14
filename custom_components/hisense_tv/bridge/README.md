@@ -55,14 +55,14 @@ mitinstalliert.
 
 ## Aktivierung in Home Assistant (empfohlen)
 
-Seit 0.3.09 startet die Integration den Bridge selbst als überwachten Prozess:
+Die Integration betreibt den Bridge **im HA-Prozess als Daemon-Thread** – kein
+separater Prozess, kein Subprozess-Supervisor:
 
-1. Zertifikate nach `/config/certs/` legen (`vidaa_client.pem` + `.key`).
+1. Zertifikate ablegen (`vidaa_client.pem` + `.key`), z. B. nach `/config/certs/`.
 2. Integration -> *Bearbeiten* (Optionen) -> Schritt **„Bridge"** aktivieren,
    TV-IP, Zertifikatspfade, ggf. MAC/Brand eintragen, speichern.
-3. Die Integration schreibt die Konfiguration nach
-   `/config/hisense_bridge/config.yaml` und startet den Daemon automatisch.
-   Log: `/config/hisense_bridge/bridge.log` (Neustart bei Absturz automatisch).
+3. Die Integration startet/stoppt den Bridge mit dem Eintrag; Logs landen im
+   **HA-Log** (Logger `hisense_bridge`). Kein eigener Logfile/Prozess mehr.
 
 ## Manueller Betrieb (alternativ)
 
@@ -142,7 +142,13 @@ korrekt umgesetzt):
   verwechseln: Bridge-Feld `mac` leer lassen (= Auto-Erkennung aus dem
   Deskriptor) oder explizit auf die Deskriptor-MAC setzen; WoL läuft
   unabhängig über die Entry-MAC weiter.
-- **Logs (integriert):** `/config/hisense_bridge/bridge.log`;
+- **Logs (integriert):** im **HA-Log** unter Logger `hisense_bridge` (kein eigener Logfile / Prozess).
+  Für ausführliche Ausgabe in `configuration.yaml`:
+  ```
+  logger:
+    logs:
+      hisense_bridge: info
+  ```
   manuell: `python3 -m custom_components.hisense_tv.bridge.bridge -c bridge/config.yaml -v`
   zeigt transport_protocol, gewählte Auth-Methode und CONNACK-Codes.
 - **Transport-Protokoll prüfen:** `curl http://<IP>:38400/MediaServer/rendererdevicedesc.xml`
