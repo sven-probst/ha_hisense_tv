@@ -30,7 +30,7 @@ async def mqtt_pub_sub(hass, pub, sub, payload=""):
                 _LOGGER.debug("Message received: %s", message)
                 yield message
             except asyncio.TimeoutError:
-                _LOGGER.warning("Timeout: no message on topic '%s' within 10 seconds", sub)
+                _LOGGER.debug("Timeout: no message on topic '%s' within 10 seconds", sub)
                 yield None  # Optional: cancel with `return` instead of `yield None`
 
     _LOGGER.debug("Subscribing to topic: '%s'", sub)

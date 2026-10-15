@@ -237,7 +237,7 @@ class HisenseAuthManager:
                 _LOGGER.warning("Authentication failed: %s", result.get("payload", {}))
             return False
         except asyncio.TimeoutError:
-            _LOGGER.error("Timeout waiting for authentication response")
+            _LOGGER.debug("Timeout waiting for authentication response")
             return False
         except Exception as e:
             _LOGGER.error("Unexpected error during authentication: %s", e)
@@ -315,7 +315,7 @@ class HisenseAuthManager:
             return False
             
         except asyncio.TimeoutError:
-            _LOGGER.error("Timeout waiting for token response")
+            _LOGGER.debug("Timeout waiting for token response")
             return False
         except Exception as e:
             _LOGGER.error("Unexpected error during token request: %s", e)
