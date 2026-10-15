@@ -594,9 +594,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             else:
                 _LOGGER.warning("Failed to refresh token")
 
-    async def async_added_to_hass(self):
-        """Subscribe to MQTT events."""
-        # Perform initial authentication with the TV
+    async def _perform_initial_auth(self):
+        """Authenticate with the TV in the background on setup."""
         _LOGGER.debug("Performing initial authentication with TV")
         auth_success = await self._auth_manager.ensure_authenticated()
         if auth_success:
@@ -607,6 +606,13 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             await self._save_token_to_config_entry()
         else:
             _LOGGER.warning("Initial authentication with TV failed - continuing without token auth")
+
+    async def async_added_to_hass(self):
+        """Subscribe to MQTT events."""
+        # Perform initial authentication with the TV. Auth requests can take up
+        # to several seconds (vidaa_app_connect / token round trips with 10s
+        # timeouts), so do it in the background instead of blocking setup.
+        self._hass.async_create_task(self._perform_initial_auth())
 
         # Set up periodic token refresh check (every 30 minutes)
         self._subscriptions["token_refresh"] = async_track_time_interval(
