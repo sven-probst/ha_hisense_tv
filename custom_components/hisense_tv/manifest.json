@@ -1,7 +1,7 @@
 {
   "domain": "hisense_tv",
   "name": "Hisense TV MQTT Bridge",
-  "version": "0.3.20",
+  "version": "0.3.21",
   "dependencies": [
     "mqtt",
     "ssdp"

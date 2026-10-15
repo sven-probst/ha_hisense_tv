@@ -780,6 +780,10 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             # If TV is now running, query sourcelist and volume
             if state_changed and new_state == STATE_PLAYING:
                 _LOGGER.debug("TV marked as running in HA, querying sourcelist and volume.")
+                if not self._is_vidaa9():
+                    # Catch up on firmware version so the VIDAA-9 handling is
+                    # active even if the TV was off during HA startup.
+                    self._hass.async_create_task(self._fetch_device_info())
                 await self._request_sourcelist()
                 await self._async_update_other_media_players(is_turning_on=True)
             elif state_changed and new_state in (STATE_OFF, STATE_STANDBY):
@@ -1153,28 +1157,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         # pushed broadcasts. Ask once on init to learn the firmware version so
         # VIDAA-9-specific handling (e.g. missing gettvstate poll response) is
         # active from the start, not only after the app list is browsed.
-        try:
-            userdata = {"deviceinfo": False}
-            async for msg in mqtt_pub_sub(
-                hass=self._hass,
-                pub=self._out_topic("/remoteapp/tv/platform_service/%s/actions/getdeviceinfo"),
-                sub=self._in_topic("/remoteapp/mobile/%s/platform_service/data/getdeviceinfo"),
-            ):
-                try:
-                    payload = json.loads(msg[0].payload)
-                    self._tv_version = payload.get("tv_version", "")
-                    self._transport_protocol = payload.get("transport_protocol")
-                    _LOGGER.debug(
-                        "Device info fetched on init (transport_protocol=%s, tv_version=%s)",
-                        self._transport_protocol, self._tv_version,
-                    )
-                except (JSONDecodeError, TypeError, IndexError) as err:
-                    _LOGGER.warning(
-                        "Could not parse device info on init: %s", err
-                    )
-                break
-        except asyncio.TimeoutError:
-            _LOGGER.debug("Timeout fetching device info on init")
+        await self._fetch_device_info()
 
         await mqtt.async_publish(
             hass=self._hass,
@@ -1182,6 +1165,36 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             payload="",
             retain=False,
         )
+
+    async def _fetch_device_info(self):
+        """Fetch and cache device info (firmware version, transport protocol)."""
+        if self._tv_version is not None and self._transport_protocol is not None:
+            return
+        stream, unsubscribe = await mqtt_pub_sub(
+            hass=self._hass,
+            pub=self._out_topic("/remoteapp/tv/platform_service/%s/actions/getdeviceinfo"),
+            sub=self._in_topic("/remoteapp/mobile/%s/platform_service/data/getdeviceinfo"),
+        )
+        try:
+            async for msg in stream:
+                if msg is None:
+                    _LOGGER.debug("No device info response (TV off?); keeping current values")
+                    break
+                try:
+                    payload = json.loads(msg[0].payload)
+                    self._tv_version = payload.get("tv_version", "")
+                    self._transport_protocol = payload.get("transport_protocol")
+                    _LOGGER.debug(
+                        "Device info fetched (transport_protocol=%s, tv_version=%s)",
+                        self._transport_protocol, self._tv_version,
+                    )
+                except (JSONDecodeError, TypeError, IndexError) as err:
+                    _LOGGER.warning(
+                        "Could not parse device info: %s", err
+                    )
+                break
+        finally:
+            unsubscribe()
 
     async def _ensure_sourcelist(self):
         """Make sure we have the sourcelist if TV is on."""
