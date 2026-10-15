@@ -260,6 +260,19 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         _LOGGER.debug("state %s", self._state)
         return self._state
 
+    def _is_vidaa9(self) -> bool:
+        """Return True if the TV runs VIDAA 9 (transport_protocol >= 3000)."""
+        try:
+            if self._transport_protocol is not None:
+                return int(str(self._transport_protocol)) >= 3000
+        except (ValueError, TypeError):
+            pass
+        # Fallback: tv_version like "V0000.09.xx" marks VIDAA 9 firmware.
+        try:
+            return str(self._tv_version or "").startswith("V0000.09")
+        except (TypeError, AttributeError):
+            return False
+
     async def async_update(self):
         """Get the latest data and updates the states."""
         # Standard polling interval check
@@ -276,7 +289,13 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         if self._pending_poll_response:
             self._missed_polls += 1
             # If we miss 2 consecutive polls, we assume the TV is off.
-            if self._missed_polls >= 2 and self._state != STATE_OFF:
+            # VIDAA 9 never answers the gettvstate poll (state is push-driven via
+            # broadcasts), so the missed-poll heuristic would mark it off wrongly.
+            if (
+                self._missed_polls >= 2
+                and self._state != STATE_OFF
+                and not self._is_vidaa9()
+            ):
                 _LOGGER.info("TV did not respond to 2 consecutive state requests. Assuming it's off.")
                 self._state = STATE_OFF
                 self.async_write_ha_state()

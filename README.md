@@ -369,4 +369,13 @@ keine abfragbare EPG-Quelle mehr (die bisherigen Getter `getepginfo`, `getprogra
 `media_duration`/`media_position` berechnen auf VIDAA 9 deshalb `0` – die Werte sollten
 nur bei älteren VIDAA-Versionen (`transport_protocol` < 3000) ausgewertet werden.
 
+## Zustandserkennung (Ein/Aus) auf VIDAA 9
+
+VIDAA 9 beantwortet den `gettvstate`-Poll **nicht mehr** (state updates kommen nur noch
+als Push-Broadcasts). Damit würde die alte Heuristik (2 verpasste Polls → `off`) den TV
+fälschlich als aus markieren und erkannte Push-Werte wieder umwerfen. Seit 0.3.18 wird
+diese Heuristik auf VIDAA 9 **deaktiviert**; der Zustand wird dann ausschließlich über
+die Push-Signale gesetzt (`tvsleep`-Broadcast bzw. `statetype fake_sleep_0` → Standby/off).
+Auf älteren VIDAA-Versionen bleibt das Polling unverändert.
+
 
