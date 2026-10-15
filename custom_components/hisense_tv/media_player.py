@@ -169,6 +169,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
         self._muted = False
         self._key_delay = key_delay
+        self._transport_protocol = None
+        self._tv_version = None
         self._attr_unique_id = uid
         self._volume = 0
         self._state = STATE_OFF
@@ -910,7 +912,13 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                         break
                     payload = json.loads(payload_string)
                     transport_protocol = payload.get("transport_protocol")
-                    _LOGGER.debug("Transport Protocol: %s", transport_protocol)
+                    tv_version = payload.get("tv_version", "")
+                    self._tv_version = tv_version
+                    self._transport_protocol = transport_protocol
+                    _LOGGER.debug(
+                        "Transport Protocol: %s, tv_version: %s",
+                        transport_protocol, tv_version,
+                    )
                 except JSONDecodeError as err:
                     _LOGGER.warning(
                         "Could not parse device info from '%s': %s", msg, err.msg

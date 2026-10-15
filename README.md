@@ -325,4 +325,48 @@ Daemon-Thread** (kein separater Prozess; Logs im HA-Log unter Logger `hisense_br
 Alternativ kann der Daemon auch eigenständig laufen, Details im
 [Bridge-README](custom_components/hisense_tv/bridge/README.md).
 
+## `sendkey`-Codes auf VIDAA 9 (Live-Beobachtung)
+
+Auf VIDAA 9 (`V0000.09.xx`, `transport_protocol` >= 3000) unterscheiden sich einige
+`sendkey`-Codes von älteren VIDAA-Versionen. Die folgenden Ergebnisse wurden live gegen
+einen VIDAA-9-TV ermittelt:
+
+| Code | Effekt auf VIDAA 9 |
+|------|--------------------|
+| `KEY_AUDIO` | **Schaltet das Bild aus** (Bildschirm-Off; „lautlos weiter TV"?). Einzeln bestätigt; Bild zurück mit `KEY_EXIT`. |
+| `KEY_LANG` | Kein Sprach-/Audiospuren-Menü |
+| `KEY_LANGUAGE` | **Öffnet das Sprach-/Audiospuren-Menü** (Reaktion sichtbar über `sourceswitch`-Broadcast; Key belegt durch TV-Binary-Hexdump, siehe unten). Das ist auf VIDAA 9 das Gegenstück zu `KEY_MTS` älterer VIDAA-Versionen |
+| `KEY_SUBTITLE` | Öffnet ein **Untertitel-Menü** (MQTT-sichtbar nur ein `sourceswitch`-Broadcast, kein „subtitle"-Statetype) |
+| `KEY_CC` | Kein Menü ausgelöst (Key belegt durch TV-Binary-Hexdump) |
+| `KEY_TXT` | Öffnet **Teletext** (Reaktion sichtbar über `sourceswitch`-Broadcast; Key belegt durch TV-Binary-Hexdump) |
+| `KEY_GUIDE`/`KEY_INFO`/`KEY_EPG` | Öffnet die Sender-/Programmübersicht (Broadcast `{"statetype":"remote_epg"}` ohne Zusatzdaten) |
+
+> **Hinweis zur Testmethode:** Auf diesem VIDAA-9-TV wirkt bei mehreren in schneller Folge
+> gesendeten `sendkey`-Befehlen offenbar **nur die letzte Taste**. Alle Ergebnisse oben
+> wurden deshalb **einzeln** verifiziert.
+>
+> **Quelle der Key-Namen:** `KEY_MTS`, `KEY_LANGUAGE`, `KEY_CC`, `KEY_TXT` (sowie weitere)
+> stammen aus dem öffentlich dokumentierten **Hexdump des remoteservice-Binaries** eines
+> Hisense-TVs (Home-Assistant-Community, „Hisense TV Control"). `KEY_SOUNDTRACK` wurde
+> in Tests verwendet, ist aber durch **keine** Quelle belegt und funktioniert nicht –
+> nicht verwenden.
+>
+> **Achtung:** `KEY_AUDIO` ist der **Bildschirm-Off-Key** (kein Sprach-/Audiospuren-Menü).
+> Bild zurück mit `KEY_EXIT`. Nicht als Audiospuren-Umschalter verwenden.
+>
+> **Sprach-/Audiospuren-Taste („LANG"):** Die VIDAA-9-Remote-API nutzt für das
+> Sprach-/Audiospuren-Menü den Key **`KEY_LANGUAGE`** (`send_key("LANGUAGE")`), nicht
+> `KEY_LANG` (der Key der älteren VIDAA-Versionen). Die physische LANG-Taste der
+> Fernbedienung geht per IR/RF direkt an den TV und erzeugt keinen MQTT-sichtbaren
+> Zustandswechsel.
+
+## EPG-Felder (`progname`/`starttime`/`endtime`) auf VIDAA 9
+
+Der `ui_service/state`-Broadcast (`statetype: livetv`) wird auf VIDAA 9 **immer leer**
+geliefert (`"progname":"", "starttime":0, "endtime":0`). Es gibt auf dieser Firmware
+keine abfragbare EPG-Quelle mehr (die bisherigen Getter `getepginfo`, `getprograminfo`,
+`getcurrentprogram`, `geteventinfo`, `getchannellistinfo`, `channellist` antworten nicht).
+`media_duration`/`media_position` berechnen auf VIDAA 9 deshalb `0` – die Werte sollten
+nur bei älteren VIDAA-Versionen (`transport_protocol` < 3000) ausgewertet werden.
+
 
