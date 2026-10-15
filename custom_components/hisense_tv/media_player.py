@@ -604,6 +604,13 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             await self._auth_manager.send_login_info()
             # Save token to config entry for persistence
             await self._save_token_to_config_entry()
+        elif self._auth_manager.current_token:
+            # A stored token is still valid for data topics even if the fresh
+            # auth round trip failed at startup (e.g. VIDAA 9 slow to answer).
+            _LOGGER.debug(
+                "Startup auth round trip failed but a stored token exists - "
+                "continuing with existing token"
+            )
         else:
             _LOGGER.warning("Initial authentication with TV failed - continuing without token auth")
 
