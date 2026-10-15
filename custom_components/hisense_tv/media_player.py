@@ -1149,6 +1149,33 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def _check_tv_state(self):
         """Check TV state during initialization and request sourcelist if on."""
+        # VIDAA 9 never answers the gettvstate poll; the state is reported via
+        # pushed broadcasts. Ask once on init to learn the firmware version so
+        # VIDAA-9-specific handling (e.g. missing gettvstate poll response) is
+        # active from the start, not only after the app list is browsed.
+        try:
+            userdata = {"deviceinfo": False}
+            async for msg in mqtt_pub_sub(
+                hass=self._hass,
+                pub=self._out_topic("/remoteapp/tv/platform_service/%s/actions/getdeviceinfo"),
+                sub=self._in_topic("/remoteapp/mobile/%s/platform_service/data/getdeviceinfo"),
+            ):
+                try:
+                    payload = json.loads(msg[0].payload)
+                    self._tv_version = payload.get("tv_version", "")
+                    self._transport_protocol = payload.get("transport_protocol")
+                    _LOGGER.debug(
+                        "Device info fetched on init (transport_protocol=%s, tv_version=%s)",
+                        self._transport_protocol, self._tv_version,
+                    )
+                except (JSONDecodeError, TypeError, IndexError) as err:
+                    _LOGGER.warning(
+                        "Could not parse device info on init: %s", err
+                    )
+                break
+        except asyncio.TimeoutError:
+            _LOGGER.debug("Timeout fetching device info on init")
+
         await mqtt.async_publish(
             hass=self._hass,
             topic=self._out_topic("/remoteapp/tv/ui_service/%s/actions/gettvstate"),
