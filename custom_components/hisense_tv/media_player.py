@@ -612,7 +612,9 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                 "continuing with existing token"
             )
         else:
-            _LOGGER.warning("Initial authentication with TV failed - continuing without token auth")
+            # VIDAA 9 works without a stored token (e.g. /data/gettoken is not
+            # required for controlling the TV), so this is not an error.
+            _LOGGER.debug("Initial authentication with TV failed - continuing without token auth")
 
     async def async_added_to_hass(self):
         """Subscribe to MQTT events."""
