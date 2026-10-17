@@ -182,7 +182,8 @@ class HisenseAuthManager:
         # Build topics
         topic_response = self._mqtt_in + AUTH_TOPIC_RESPONSE.format(client_id=self._client_id)
         topic_publish = self._mqtt_out + AUTH_TOPIC_PUBLISH.format(client_id=self._client_id)
-        
+
+        unsub = None
         try:
             # Subscribe to connect response
             unsub = await mqtt.async_subscribe(

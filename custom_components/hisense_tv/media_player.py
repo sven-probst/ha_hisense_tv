@@ -184,7 +184,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             stored_token=stored_token,
         )
         # Request sourcelist on init if TV is already on 
-        self._hass.async_create_task(self._check_tv_state())
+        self._spawn_background_task(self._check_tv_state())
 
         self._source_name = None
         self._source_id = None
@@ -205,8 +205,16 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._missed_polls = 0
         self._input_text = None  # store "bwsinputdata"
         self._turn_off_retry_task = None
+        self._background_tasks: set = set()
 
         self._sourcelist_requested = False
+
+    def _spawn_background_task(self, coro):
+        """Create a tracked background task (holds a reference to avoid GC)."""
+        task = self._hass.async_create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
 
     @property
     def should_poll(self):
@@ -456,7 +464,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         # Always ensure sourcelist is requested if empty and not already requested
         if not self._sourcelist_requested and len(self._source_list) <= 1:
             _LOGGER.debug("Requesting source list from TV (via ensure_sourcelist).")
-            self._hass.async_create_task(self._ensure_sourcelist())
+            self._spawn_background_task(self._ensure_sourcelist())
         # Return the sources in the order received from the TV
         return list(self._source_list)
 
@@ -552,6 +560,9 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
     async def async_will_remove_from_hass(self):
         self._cancel_turn_off_retry()
+        for task in list(self._background_tasks):
+            task.cancel()
+        self._background_tasks.clear()
         for unsubscribe in list(self._subscriptions.values()):
             unsubscribe()
 
@@ -606,7 +617,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         # Perform initial authentication with the TV. Auth requests can take up
         # to several seconds (vidaa_app_connect / token round trips with 10s
         # timeouts), so do it in the background instead of blocking setup.
-        self._hass.async_create_task(self._perform_initial_auth())
+        self._spawn_background_task(self._perform_initial_auth())
 
         # Set up periodic token refresh check (every 30 minutes)
         self._subscriptions["token_refresh"] = async_track_time_interval(
@@ -783,7 +794,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
                 if not self._is_vidaa9():
                     # Catch up on firmware version so the VIDAA-9 handling is
                     # active even if the TV was off during HA startup.
-                    self._hass.async_create_task(self._fetch_device_info())
+                    self._spawn_background_task(self._fetch_device_info())
                 await self._request_sourcelist()
                 await self._async_update_other_media_players(is_turning_on=True)
             elif state_changed and new_state in (STATE_OFF, STATE_STANDBY):
