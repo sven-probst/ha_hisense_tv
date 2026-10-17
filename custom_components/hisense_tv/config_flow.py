@@ -163,6 +163,10 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_MQTT_IN] = user_input[CONF_MQTT_IN]
             self._data[CONF_MQTT_OUT] = user_input[CONF_MQTT_OUT]
             self._data[CONF_KEY_DELAY] = user_input.get(CONF_KEY_DELAY, DEFAULT_KEY_DELAY)
+            self._data[CONF_CLIENT_ID] = (
+                user_input.get(CONF_CLIENT_ID) or DEFAULT_CLIENT_ID
+            )
+            self._client_id = self._data[CONF_CLIENT_ID]
 
             if not self.unique_id:
                 await self.async_set_unique_id(mac, raise_on_progress=False)
@@ -180,6 +184,9 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_IP_ADDRESS, default=self._discovered_ip or ""): str,
                 vol.Optional(CONF_MQTT_IN, default=DEFAULT_MQTT_PREFIX): str,
                 vol.Optional(CONF_MQTT_OUT, default=DEFAULT_MQTT_PREFIX): str,
+                vol.Optional(
+                    CONF_CLIENT_ID, default=DEFAULT_CLIENT_ID
+                ): str,
                 vol.Optional(CONF_KEY_DELAY, default=DEFAULT_KEY_DELAY): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=2.0)),
             }
         )
@@ -195,6 +202,7 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if entry:
             self._data = dict(entry.data)
             self.unique_id = entry.unique_id
+            self._client_id = self._data.get(CONF_CLIENT_ID) or DEFAULT_CLIENT_ID
 
         # For reauth, directly go to PIN entry
         return await self.async_step_auth()
@@ -470,6 +478,10 @@ class HisenseTvOptionsFlow(config_entries.OptionsFlow):
                     description={"suggested_value": self.config_entry.data.get(CONF_MQTT_OUT)},
                 ): str,
                 vol.Optional(
+                    CONF_CLIENT_ID,
+                    description={"suggested_value": self.config_entry.data.get(CONF_CLIENT_ID, DEFAULT_CLIENT_ID)},
+                ): str,
+                vol.Optional(
                     CONF_KEY_DELAY,
                     default=self.config_entry.options.get(CONF_KEY_DELAY, self.config_entry.data.get(CONF_KEY_DELAY, DEFAULT_KEY_DELAY)),
                 ): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=2.0)),
@@ -484,6 +496,9 @@ class HisenseTvOptionsFlow(config_entries.OptionsFlow):
             merged = {**self._base_options, **user_input}
             new_data = dict(self.config_entry.data)
             new_data[CONF_MAC] = self._base_options[CONF_MAC]
+            new_data[CONF_CLIENT_ID] = (
+                merged.get(CONF_CLIENT_ID) or DEFAULT_CLIENT_ID
+            )
             self.hass.config_entries.async_update_entry(
                 self.config_entry, data=new_data, options=merged
             )

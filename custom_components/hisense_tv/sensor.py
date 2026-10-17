@@ -10,7 +10,14 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import CONF_IP_ADDRESS, CONF_MAC, CONF_NAME
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_MQTT_IN, CONF_MQTT_OUT, DEFAULT_NAME, DOMAIN
+from .const import (
+    CONF_CLIENT_ID,
+    CONF_MQTT_IN,
+    CONF_MQTT_OUT,
+    DEFAULT_CLIENT_ID,
+    DEFAULT_NAME,
+    DOMAIN,
+)
 from .helper import HisenseTvBase
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,6 +48,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         # The sensor's unique identity will be defined by its name/object_id.
         uid=uid,
         ip_address=ip_address,
+        client_id=config_entry.data.get(CONF_CLIENT_ID) or DEFAULT_CLIENT_ID,
     )
     async_add_entities([entity])
 
@@ -52,7 +60,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
     # every 5 minutes instead of every default 30s poll.
     SCAN_INTERVAL = timedelta(minutes=5)
 
-    def __init__(self, hass, name, mqtt_in, mqtt_out, mac, uid, ip_address):
+    def __init__(self, hass, name, mqtt_in, mqtt_out, mac, uid, ip_address, client_id=None):
         super().__init__(
             hass=hass,
             name=name,
@@ -61,6 +69,7 @@ class HisenseTvSensor(SensorEntity, HisenseTvBase):
             mac=mac,
             uid=uid,
             ip_address=ip_address,
+            client_id=client_id,
         )
         self.has_entity_name = True
         # This will be the name of the sensor entity.

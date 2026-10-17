@@ -56,8 +56,9 @@ class HisenseTvBase(object):
         mac: str,
         uid: str,
         ip_address: str,
+        client_id: str = None,
     ):
-        self._client = DEFAULT_CLIENT_ID
+        self._client = client_id or DEFAULT_CLIENT_ID
         self._hass = hass
         self._name = name
         self._mqtt_in = mqtt_in or ""

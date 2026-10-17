@@ -16,6 +16,7 @@ from homeassistant.const import CONF_IP_ADDRESS
 from homeassistant.core import HomeAssistant
 
 from .const import (
+    CONF_CLIENT_ID,
     CONF_MQTT_IN,
     CONF_MQTT_OUT,
     DEFAULT_CLIENT_ID,
@@ -64,7 +65,7 @@ def _build_config(entry: ConfigEntry) -> dict:
                 "keyfile": data.get(CONF_BRIDGE_KEYFILE) or None,
                 "prefix_in": data.get(CONF_MQTT_IN),
                 "prefix_out": data.get(CONF_MQTT_OUT),
-                "topic_client_id": DEFAULT_CLIENT_ID,
+                "topic_client_id": data.get(CONF_CLIENT_ID) or DEFAULT_CLIENT_ID,
             }
         ],
     }

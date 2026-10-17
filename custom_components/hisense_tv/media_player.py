@@ -38,6 +38,7 @@ from homeassistant.helpers.event import async_track_time_interval
 
 from .const import (
     ATTR_CODE,
+    CONF_CLIENT_ID,
     CONF_MQTT_IN,
     CONF_MQTT_OUT,
     CONF_TOKEN,
@@ -134,6 +135,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         key_delay=key_delay,
         config_entry=config_entry,
         stored_token=stored_token,
+        client_id=config_entry.data.get(CONF_CLIENT_ID) or DEFAULT_CLIENT_ID,
     )
     async_add_entities([entity])
 
@@ -153,6 +155,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         key_delay: float,
         config_entry=None,
         stored_token=None,
+        client_id=None,
     ):
         super().__init__(
             hass=hass,
@@ -162,6 +165,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             mac=mac,
             uid=uid,
             ip_address=ip_address,
+            client_id=client_id,
         )
         # Set a specific name to avoid conflicts with other integrations like DLNA.
         # This results in a clean entity_id like 'media_player.living_room_tv_control'.
@@ -179,7 +183,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._config_entry = config_entry
         self._auth_manager = HisenseAuthManager(
             hass=hass,
-            client_id=DEFAULT_CLIENT_ID,
+            client_id=client_id or DEFAULT_CLIENT_ID,
             mqtt_in=mqtt_in,
             mqtt_out=mqtt_out,
             mac_address=mac,
