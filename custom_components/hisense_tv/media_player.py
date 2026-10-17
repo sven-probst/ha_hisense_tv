@@ -172,7 +172,9 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._attr_unique_id = uid
         self._volume = 0
         self._state = STATE_OFF
-        
+        self._background_tasks: set = set()
+        self._turn_off_retry_task = None
+
         # Initialize auth manager
         self._config_entry = config_entry
         self._auth_manager = HisenseAuthManager(
@@ -183,7 +185,7 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
             mac_address=mac,
             stored_token=stored_token,
         )
-        # Request sourcelist on init if TV is already on 
+        # Request sourcelist on init if TV is already on
         self._spawn_background_task(self._check_tv_state())
 
         self._source_name = None
@@ -204,8 +206,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         self._pending_poll_response = False
         self._missed_polls = 0
         self._input_text = None  # store "bwsinputdata"
-        self._turn_off_retry_task = None
-        self._background_tasks: set = set()
 
         self._sourcelist_requested = False
 
