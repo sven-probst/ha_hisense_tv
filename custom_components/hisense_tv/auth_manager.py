@@ -9,10 +9,12 @@ from typing import Optional
 from dataclasses import dataclass
 
 from homeassistant.components import mqtt
+from homeassistant.const import CONF_MAC
 from homeassistant.core import HomeAssistant
 
 from .const import (
     DEFAULT_CLIENT_ID,
+    DOMAIN,
     TOKEN_VALIDITY_HOURS,
     TOKEN_REFRESH_BUFFER_HOURS,
 )
@@ -110,12 +112,29 @@ class HisenseAuthManager:
         
         # Track authentication state
         self._is_authenticated = False
-    
+        self._needs_pin = False
+
     def _generate_device_id(self) -> str:
         """Generate a consistent device ID based on MAC address."""
         mac_clean = self._mac_address.replace(":", "").replace("-", "").upper()
         hash_input = f"HisenseTV_{mac_clean}".encode()
         return hashlib.sha256(hash_input).hexdigest()[:32]
+
+    async def _async_trigger_reauth(self):
+        """Start the reauth (PIN) flow for this config entry."""
+        entries = self._hass.config_entries.async_entries(DOMAIN)
+        for entry in entries:
+            if entry.data.get(CONF_MAC) == self._mac_address:
+                _LOGGER.info("Starting reauth flow for entry %s (PIN required)", entry.entry_id)
+                self._hass.async_create_task(
+                    self._hass.config_entries.flow.async_init(
+                        DOMAIN,
+                        context={"source": "reauth", "entry_id": entry.entry_id},
+                        data=entry.data,
+                    )
+                )
+                return
+        _LOGGER.debug("No matching config entry found for reauth flow")
     
     @property
     def is_authenticated(self) -> bool:
@@ -219,6 +238,10 @@ class HisenseAuthManager:
                     "If you're in setup, please enter the PIN in the config flow. "
                     "The integration will still attempt to establish a basic session."
                 )
+                self._needs_pin = True
+                # Notify Home Assistant so the reauth (PIN) flow opens.
+                _LOGGER.debug("Requesting reauth flow for PIN entry")
+                self._hass.add_job(self._async_trigger_reauth())
                 # Still mark as "partially authenticated" - some commands work
                 # even without PIN auth on certain firmware versions
                 self._is_authenticated = True
