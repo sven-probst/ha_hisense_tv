@@ -356,7 +356,7 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.debug("Sent vidaa_app_connect for PIN dialog (form opened)")
             return self.async_show_form(
                 step_id="auth",
-                data_schema=vol.Schema({vol.Required(CONF_PIN): str}),
+                data_schema=vol.Schema({vol.Required(CONF_PIN): vol.Coerce(int)}),
                 errors=errors,
             )
         if user_input is not None:
@@ -402,17 +402,23 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Send the PIN entered by the user to the TV.
                 # VIDAA requires the PIN as an integer; a string is rejected
                 # with "illegal authNum!!".
-                payload = json.dumps({"authNum": int(user_input[CONF_PIN])})
-                await mqtt.async_publish(
-                    self.hass,
-                    f"{mqtt_out}/remoteapp/tv/ui_service/{self._client_id}/actions/authenticationcode",
-                    payload
-        )
+                try:
+                    pin_value = int(user_input[CONF_PIN])
+                except (ValueError, TypeError):
+                    _LOGGER.debug("PIN input is not numeric: %r", user_input[CONF_PIN])
+                    errors["base"] = "invalid_auth"
+                else:
+                    payload = json.dumps({"authNum": pin_value})
+                    await mqtt.async_publish(
+                        self.hass,
+                        f"{mqtt_out}/remoteapp/tv/ui_service/{self._client_id}/actions/authenticationcode",
+                        payload
+                    )
 
-                if await asyncio.wait_for(queue.get(), timeout=15):
-                    return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
-                
-                errors["base"] = "invalid_auth"
+                    if await asyncio.wait_for(queue.get(), timeout=15):
+                        return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
+
+                    errors["base"] = "invalid_auth"
 
             except asyncio.TimeoutError:
                 errors["base"] = "auth_timeout"
@@ -421,7 +427,7 @@ class HisenseTvFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="auth",
-            data_schema=vol.Schema({vol.Required(CONF_PIN): str}),
+            data_schema=vol.Schema({vol.Required(CONF_PIN): vol.Coerce(int)}),
             errors=errors,
         )
 
