@@ -379,3 +379,21 @@ die Push-Signale gesetzt (`tvsleep`-Broadcast bzw. `statetype fake_sleep_0` → 
 Auf älteren VIDAA-Versionen bleibt das Polling unverändert.
 
 
+
+## Pairing/Authentifizierung auf VIDAA 9
+
+- **Kein Pairing-Reset im TV-Menü:** VIDAA 9 bietet keine UI, um gepairte
+  MQTT-Remote-Clients zu löschen. Die VIDAA-App verwaltet nur VIDAA-Konto-Geräte
+  („Meine Geräte"); die lokale MQTT-Pairing-Liste des TVs ist davon nicht betroffen.
+  Der Wechsel des Topic-Client-ID (`client_id` in den Optionen, Default
+  `HomeAssistant`) erzwingt **kein** Neu-Pairing: Die Rechte hängen an der
+  authentifizierten Verbindung (Zertifikate/MAC-Auth der Bridge), nicht am
+  Topic-Client-String, der nur ein Routing-Namespace ist.
+- **Auto-Reauth:** Fordert der TV eine PIN (Antwort `connect_result: 0` auf
+  `vidaa_app_connect`), startet die Integration seit 0.3.32 automatisch den
+  Reauth-Flow mit PIN-Eingabe (auch ohne Zutun des Nutzers, z. B. nach
+  Firmware-Wechsel oder TV-seitigem Zurücksetzen).
+- **Manueller Reauth-Test:** Integration → „Hisense TV" → ⋮ → „Authentifizierung
+  erneut ausführen". Da der TV bei bestehender Kopplung `connect_result: 1`
+  liefert, erscheint kein PIN-Dialog am TV und die Eingabe würde abgelehnt –
+  der Test zeigt aber, dass Flow und `vidaa_app_connect`-Sendung funktionieren.
