@@ -19,6 +19,7 @@ from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
 
 from .const import (
+    CONF_CLIENT_ID,
     CONF_MQTT_IN,
     CONF_KEY_DELAY,
     CONF_MQTT_OUT,
