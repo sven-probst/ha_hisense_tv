@@ -169,8 +169,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
 
         self._muted = False
         self._key_delay = key_delay
-        self._transport_protocol = None
-        self._tv_version = None
         self._attr_unique_id = uid
         self._volume = 0
         self._state = STATE_OFF
@@ -259,19 +257,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         """Return the state of the device."""
         _LOGGER.debug("state %s", self._state)
         return self._state
-
-    def _is_vidaa9(self) -> bool:
-        """Return True if the TV runs VIDAA 9 (transport_protocol >= 3000)."""
-        try:
-            if self._transport_protocol is not None:
-                return int(str(self._transport_protocol)) >= 3000
-        except (ValueError, TypeError):
-            pass
-        # Fallback: tv_version like "V0000.09.xx" marks VIDAA 9 firmware.
-        try:
-            return str(self._tv_version or "").startswith("V0000.09")
-        except (TypeError, AttributeError):
-            return False
 
     async def async_update(self):
         """Get the latest data and updates the states."""
@@ -1046,7 +1031,8 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         if media_content_id == "app_list":
             return await self._build_app_list_node()
 
-        list_name = self._channel_infos.get(media_content_id).get("list_name")
+        channel_info_entry = self._channel_infos.get(media_content_id)
+        list_name = (channel_info_entry or {}).get("list_name")
         node = BrowseMedia(
             title=list_name,
             media_class=MediaClass.DIRECTORY,
@@ -1072,33 +1058,38 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         )
 
         try:
-            async for msg in stream_get:
-                try:
-                    payload_string = msg[0].payload
-                    if not payload_string or not isinstance(payload_string, str):
-                        _LOGGER.debug("Skipping empty or invalid payload for channellist")
+            async with asyncio.timeout(2.0):
+                async for msg in stream_get:
+                    first = msg[0] if msg else None
+                    if first is None:
+                        _LOGGER.debug("Skipping empty payload for channellist")
                         break
-                    payload = json.loads(payload_string)
-                    for item in payload.get("list"):
-                        node.children.append(
-                            BrowseMedia(
-                                title=item.get("channel_name"),
-                                media_class=MediaClass.CHANNEL,
-                                media_content_type=MediaType.CHANNEL,
-                                media_content_id=item.get("channel_param"),
-                                can_play=True,
-                                can_expand=False,
+                    try:
+                        payload_string = first.payload
+                        if not payload_string or not isinstance(payload_string, str):
+                            _LOGGER.debug("Skipping empty or invalid payload for channellist")
+                            break
+                        payload = json.loads(payload_string)
+                        for item in payload.get("list") or []:
+                            node.children.append(
+                                BrowseMedia(
+                                    title=item.get("channel_name"),
+                                    media_class=MediaClass.CHANNEL,
+                                    media_content_type=MediaType.CHANNEL,
+                                    media_content_id=item.get("channel_param"),
+                                    can_play=True,
+                                    can_expand=False,
+                                )
                             )
+                    except JSONDecodeError as err:
+                        _LOGGER.warning(
+                            "Could not build channel list from '%s': %s", msg, err.msg
                         )
-                except JSONDecodeError as err:
-                    _LOGGER.warning(
-                        "Could not build channel list from '%s': %s", msg, err.msg
-                    )
-                break
-        except asyncio.TimeoutError:
+                    break
+        except (asyncio.TimeoutError, TimeoutError):
             _LOGGER.debug("timeout error - channellist")
-
-        unsubscribe_channellist()
+        finally:
+            unsubscribe_channellist()
         return node
 
     async def async_play_media(self, media_type, media_id, **kwargs):
@@ -1192,9 +1183,6 @@ class HisenseTvEntity(MediaPlayerEntity, HisenseTvBase):
         )
         try:
             async for msg in stream:
-                if msg is None:
-                    _LOGGER.debug("No device info response (TV off?); keeping current values")
-                    break
                 try:
                     payload = json.loads(msg[0].payload)
                     self._tv_version = payload.get("tv_version", "")

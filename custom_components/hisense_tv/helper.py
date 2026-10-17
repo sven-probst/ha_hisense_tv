@@ -11,7 +11,13 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def mqtt_pub_sub(hass, pub, sub, payload=""):
-    """Wrapper for publishing MQTT topics and receive replies on a subscibed topic."""
+    """Wrapper for publishing MQTT topics and receive replies on a subscibed topic.
+
+    The returned generator yields received messages as ``(message,)`` tuples and
+    ends (returns) after 10 seconds without a response. Callers must check
+    whether the first tuple element is ``None`` (yielded from queued payload)
+    before use.
+    """
     loop = asyncio.get_event_loop()
     queue = asyncio.Queue()
 
@@ -22,16 +28,14 @@ async def mqtt_pub_sub(hass, pub, sub, payload=""):
         loop.call_soon_threadsafe(queue.put_nowait, args)
 
     async def get():
-        while True:
-
-            try:
-                _LOGGER.debug("Waiting for message on topic '%s'...", sub)
-                message = await asyncio.wait_for(queue.get(), timeout=10)
-                _LOGGER.debug("Message received: %s", message)
-                yield message
-            except asyncio.TimeoutError:
-                _LOGGER.debug("Timeout: no message on topic '%s' within 10 seconds", sub)
-                yield None  # Optional: cancel with `return` instead of `yield None`
+        try:
+            _LOGGER.debug("Waiting for message on topic '%s'...", sub)
+            message = await asyncio.wait_for(queue.get(), timeout=10)
+            _LOGGER.debug("Message received: %s", message)
+            yield message
+        except asyncio.TimeoutError:
+            _LOGGER.debug("Timeout: no message on topic '%s' within 10 seconds", sub)
+            return  # End the generator instead of yielding None.
 
     _LOGGER.debug("Subscribing to topic: '%s'", sub)
     unsubscribe = await mqtt.async_subscribe(hass=hass, topic=sub, msg_callback=put)
@@ -75,6 +79,25 @@ class HisenseTvBase(object):
             "inputdata": lambda: None,
             "token_refresh": lambda: None,
         }
+        # VIDAA 9 detection inputs; subclasses set these when known.
+        self._transport_protocol = None
+        self._tv_version = None
+
+    def _is_vidaa9(self) -> bool:
+        """Return True if the TV runs VIDAA 9 (transport_protocol >= 3000).
+
+        Falls back to the tv_version string ("V0000.09.xx") when the TV does
+        not report transport_protocol (VIDAA 9 omits it from getdeviceinfo).
+        """
+        try:
+            if self._transport_protocol is not None:
+                return int(str(self._transport_protocol)) >= 3000
+        except (ValueError, TypeError):
+            pass
+        try:
+            return str(self._tv_version or "").startswith("V0000.09")
+        except (TypeError, AttributeError):
+            return False
 
     def _out_topic(self, topic=""):
         try:

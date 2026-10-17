@@ -18,25 +18,6 @@ _LOGGER = logging.getLogger(__name__)
 last_webostv_text = {}
 
 
-def _is_vidaa9(media_player) -> bool:
-    """Return True if the TV runs VIDAA 9 (transport_protocol >= 3000)."""
-    try:
-        if getattr(media_player, "_transport_protocol", None) is not None:
-            protocol = str(media_player._transport_protocol)
-            try:
-                return int(protocol) >= 3000
-            except ValueError:
-                return False
-    except (TypeError, AttributeError):
-        pass
-    # Fallback: tv_version like "V0000.09.xx" marks VIDAA 9 firmware.
-    try:
-        tv_version = str(getattr(media_player, "_tv_version", "") or "")
-        return tv_version.startswith("V0000.09")
-    except (TypeError, AttributeError):
-        return False
-
-
 async def async_setup_webos_compatibility(hass: HomeAssistant, get_entity_func):
     """Set up the webOS compatibility services."""
     if not WEBOSTV_DOMAIN:
@@ -71,7 +52,7 @@ async def async_setup_webos_compatibility(hass: HomeAssistant, get_entity_func):
             if button_upper == "LANGUAGE":
                 key_map["LANGUAGE"] = (
                     "LANGUAGE"
-                    if _is_vidaa9(media_player)
+                    if media_player._is_vidaa9()
                     else "LANG"
                 )
             hisense_key = key_map.get(button_upper, button_upper)
